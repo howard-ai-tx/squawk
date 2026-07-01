@@ -129,7 +129,7 @@ const KEY_USERS       = 'squawk_users';
 const KEY_SUBMISSIONS = 'squawk_submissions';
 const KEY_EVENTS      = 'squawk_events';
 const KEY_SESSION     = 'squawk_session';
-const KEY_INIT        = 'squawk_initialized';
+const KEY_INIT        = 'squawk_initialized_v2';
 
 function load(key, fallback = []) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
