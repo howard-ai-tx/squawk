@@ -91,8 +91,8 @@ function closeModal() {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-async function init() {
-  await DB.seed();
+function init() {
+  DB.seed();
   currentUser = DB.Auth.currentUser();
 
   if (currentUser && currentUser.role !== 'admin') {
@@ -147,7 +147,7 @@ function renderLoginView() {
 
     const email    = document.getElementById('a-email').value.trim();
     const password = document.getElementById('a-password').value;
-    const user     = await DB.Auth.login(email, password);
+    const user     = DB.Auth.login(email, password);
 
     if (!user || user.role !== 'admin') {
       document.getElementById('a-login-error-text').textContent = 'Email or password is incorrect.';

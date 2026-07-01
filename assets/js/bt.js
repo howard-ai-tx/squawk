@@ -50,8 +50,8 @@ function toast(message, type = 'success') {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-async function init() {
-  await DB.seed();
+function init() {
+  DB.seed();
   currentUser = DB.Auth.currentUser();
 
   if (currentUser) {
@@ -137,12 +137,12 @@ function renderLoginView() {
         const pass = document.getElementById('login-new-password').value;
         if (!otp || !pass) { showLoginError('Please enter your code and set a password.'); return; }
         if (pass.length < 8) { showLoginError('Password must be at least 8 characters.'); return; }
-        const user = await DB.Auth.firstLogin(emailInput.value.trim(), otp, pass);
+        const user = DB.Auth.firstLogin(emailInput.value.trim(), otp, pass);
         if (!user) { showLoginError('That code is incorrect. Check with your Howard AI contact.'); return; }
         currentUser = user;
       } else {
         const pass = document.getElementById('login-password').value;
-        const user = await DB.Auth.login(emailInput.value.trim(), pass);
+        const user = DB.Auth.login(emailInput.value.trim(), pass);
         if (!user || user.role !== 'bt') { showLoginError('Email or password is incorrect.'); return; }
         currentUser = user;
       }

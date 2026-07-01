@@ -110,9 +110,14 @@ function getRoutedRep(category) {
 
 // ─── CRYPTO ──────────────────────────────────────────────────────────────────
 
-async function sha256(str) {
-  const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+function hashPassword(str) {
+  // Simple deterministic obfuscation for localStorage-only tool
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return btoa(str + ':sq:' + h.toString(16));
 }
 
 function genId() {
@@ -129,7 +134,7 @@ const KEY_USERS       = 'squawk_users';
 const KEY_SUBMISSIONS = 'squawk_submissions';
 const KEY_EVENTS      = 'squawk_events';
 const KEY_SESSION     = 'squawk_session';
-const KEY_INIT        = 'squawk_initialized_v2';
+const KEY_INIT        = 'squawk_initialized_v3';
 
 function load(key, fallback = []) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
@@ -142,55 +147,51 @@ function save(key, value) {
 
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
 
-async function seed() {
+function seed() {
   if (localStorage.getItem(KEY_INIT)) return;
 
   const now = Date.now();
-
-  const hHash = await sha256('20265657');
-  const tHash = await sha256('20266759');
-  const jHash = await sha256('test');
 
   const users = [
     {
       id: 'admin_hendrik', name: 'Hendrik Van Geertruyden',
       email: 'hvangeertruyden@howardai.us',
-      passwordHash: hHash, role: 'admin',
+      passwordHash: hashPassword('20265657'), role: 'admin',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
       id: 'admin_tucker', name: 'Tucker Pate',
       email: 'tpate@howardai.us',
-      passwordHash: tHash, role: 'admin',
+      passwordHash: hashPassword('20266759'), role: 'admin',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
       id: 'admin_jane', name: 'Jane Doe',
       email: 'jdoe@howardai.us',
-      passwordHash: jHash, role: 'admin',
+      passwordHash: hashPassword('test'), role: 'admin',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
       id: 'bt_alice', name: 'Alice Chen',
       email: 'alice@example.com',
-      passwordHash: await sha256('alicepass'), role: 'bt',
+      passwordHash: hashPassword('alicepass'), role: 'bt',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 14*86400000).toISOString()
     },
     {
       id: 'bt_marcus', name: 'Marcus Webb',
       email: 'marcus@example.com',
-      passwordHash: await sha256('marcuspass'), role: 'bt',
+      passwordHash: hashPassword('marcuspass'), role: 'bt',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 10*86400000).toISOString()
     },
     {
       id: 'bt_priya', name: 'Priya Nair',
       email: 'priya@example.com',
-      passwordHash: await sha256('priyapass'), role: 'bt',
+      passwordHash: hashPassword('priyapass'), role: 'bt',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 7*86400000).toISOString()
     },
@@ -288,8 +289,8 @@ async function seed() {
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 const Auth = {
-  async login(email, password) {
-    const hash  = await sha256(password);
+  login(email, password) {
+    const hash  = hashPassword(password);
     const users = load(KEY_USERS);
     const user  = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash && u.otpUsed);
     if (!user) return null;
@@ -298,11 +299,11 @@ const Auth = {
     return user;
   },
 
-  async firstLogin(email, otp, newPassword) {
+  firstLogin(email, otp, newPassword) {
     const users = load(KEY_USERS);
     const idx   = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase() && u.otp === otp && !u.otpUsed);
     if (idx === -1) return null;
-    users[idx].passwordHash = await sha256(newPassword);
+    users[idx].passwordHash = hashPassword(newPassword);
     users[idx].otp          = null;
     users[idx].otpUsed      = true;
     save(KEY_USERS, users);
