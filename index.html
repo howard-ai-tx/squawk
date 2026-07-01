@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Squawk — Beta Tester Feedback</title>
+  <meta name="description" content="Howard AI beta tester feedback portal.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="Squawk-favicon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
+</head>
+<body>
+
+  <!-- Login view (shown when unauthenticated, no nav) -->
+  <div data-view="login"></div>
+
+  <!-- Authenticated shell -->
+  <div class="bt-shell" id="bt-authenticated" style="display:flex;flex-direction:column">
+    <nav class="bt-nav" id="bt-nav">
+      <div class="bt-nav-inner">
+        <div class="bt-nav-logo">
+          <img src="Squawk-logo.png" alt="Squawk by Howard AI">
+        </div>
+        <ul class="bt-nav-links" role="list">
+          <li><a data-target="submit" role="button" tabindex="0">Submit Feedback</a></li>
+          <li><a data-target="my-submissions" role="button" tabindex="0">My Submissions</a></li>
+        </ul>
+        <button class="btn btn-secondary btn-sm" id="btn-signout">Sign Out</button>
+      </div>
+    </nav>
+
+    <main class="bt-main">
+      <div data-view="submit"></div>
+      <div data-view="my-submissions"></div>
+      <div data-view="submission-detail"></div>
+      <div data-view="confirm"></div>
+    </main>
+  </div>
+
+  <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/bt.js"></script>
+</body>
+</html>

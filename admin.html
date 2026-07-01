@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Squawk Admin — Howard AI</title>
+  <meta name="description" content="Howard AI internal feedback triage system.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="Squawk-favicon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
+</head>
+<body>
+
+  <!-- Login view -->
+  <div data-view="login"></div>
+
+  <!-- Admin shell (sidebar + main) -->
+  <div class="admin-shell" id="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-logo">
+        <img src="Squawk-logo.png" alt="Squawk by Howard AI">
+      </div>
+      <nav class="admin-nav" aria-label="Admin navigation">
+        <button class="admin-nav-item" data-target="records">
+          <i class="ti ti-files" style="font-size:20px" aria-hidden="true"></i>
+          Records
+        </button>
+        <button class="admin-nav-item" data-target="dashboard">
+          <i class="ti ti-chart-bar" style="font-size:20px" aria-hidden="true"></i>
+          Dashboard
+        </button>
+        <button class="admin-nav-item" data-target="beta-testers">
+          <i class="ti ti-users" style="font-size:20px" aria-hidden="true"></i>
+          Beta Testers
+        </button>
+        <div class="admin-nav-divider"></div>
+        <button class="admin-nav-item admin-nav-signout" id="btn-admin-signout">
+          <i class="ti ti-logout" style="font-size:20px" aria-hidden="true"></i>
+          Sign Out
+        </button>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <div data-view="records"></div>
+      <div data-view="dashboard"></div>
+      <div data-view="beta-testers"></div>
+      <div data-view="ticket"></div>
+    </main>
+  </div>
+
+  <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>
