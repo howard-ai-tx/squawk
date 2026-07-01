@@ -143,7 +143,9 @@ function renderLoginView() {
       } else {
         const pass = document.getElementById('login-password').value;
         const user = DB.Auth.login(emailInput.value.trim(), pass);
-        if (!user || user.role !== 'bt') { showLoginError('Email or password is incorrect.'); return; }
+        if (!user) { showLoginError('Email or password is incorrect.'); return; }
+        if (user.role === 'admin') { window.location.href = 'admin.html'; return; }
+        if (user.role !== 'bt') { showLoginError('Email or password is incorrect.'); return; }
         currentUser = user;
       }
       showView('submit');

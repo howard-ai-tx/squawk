@@ -134,11 +134,20 @@ const KEY_USERS       = 'squawk_users';
 const KEY_SUBMISSIONS = 'squawk_submissions';
 const KEY_EVENTS      = 'squawk_events';
 const KEY_SESSION     = 'squawk_session';
-const KEY_INIT        = 'squawk_initialized_v3';
+const KEY_INIT        = 'squawk_initialized_v4';
 
 function load(key, fallback = []) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
   catch { return fallback; }
+}
+
+function sessionLoad(key, fallback = null) {
+  try { return JSON.parse(sessionStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+
+function sessionSave(key, value) {
+  sessionStorage.setItem(key, JSON.stringify(value));
 }
 
 function save(key, value) {
@@ -211,78 +220,9 @@ function seed() {
     }
   ];
 
-  const submissions = [
-    {
-      id: 'sub_001', btId: 'bt_alice',
-      submittedAt: new Date(now - 12*86400000).toISOString(),
-      category: 'software', subcategory: 'crash',
-      interface: 'arken', severity: 'high',
-      message: "Arken crashed completely during the initial setup on step 4. I had to restart the device. After restarting it got stuck on the loading screen for about 3 minutes before finally coming through. This happened twice in a row.",
-      attachmentData: null
-    },
-    {
-      id: 'sub_002', btId: 'bt_alice',
-      submittedAt: new Date(now - 9*86400000).toISOString(),
-      category: 'ux', subcategory: 'feature_avoidance',
-      interface: 'arken', severity: 'medium',
-      message: "I haven't been using the spending controls feature at all. Every time I open it the number of options feels overwhelming and I'm not sure what 'strict mode' does vs 'guided mode'. I don't want to set something wrong and have Howard start blocking things it shouldn't.",
-      attachmentData: null
-    },
-    {
-      id: 'sub_003', btId: 'bt_marcus',
-      submittedAt: new Date(now - 8*86400000).toISOString(),
-      category: 'hardware', subcategory: 'overheating',
-      interface: 'other', severity: 'high',
-      message: "The unit gets very warm to the touch after about 2 hours of running. Not hot enough that I'd call it dangerous but definitely uncomfortable. It's sitting on my desk with good airflow so I don't think placement is the issue. Should I be concerned?",
-      attachmentData: null
-    },
-    {
-      id: 'sub_004', btId: 'bt_marcus',
-      submittedAt: new Date(now - 5*86400000).toISOString(),
-      category: 'setup', subcategory: 'step_unclear',
-      interface: 'arken', severity: 'low',
-      message: "Step 4 of the Arken setup was a bit vague. It asked me to 'configure network preferences' but didn't explain what each option actually does. I guessed and it seems fine, but I wasn't confident I was making the right choice.",
-      attachmentData: null
-    },
-    {
-      id: 'sub_005', btId: 'bt_priya',
-      submittedAt: new Date(now - 3*86400000).toISOString(),
-      category: 'voice', subcategory: 'misrecognition',
-      interface: 'howard_messaging', severity: 'medium',
-      message: "Howard often mishears my name when I introduce context — it keeps transcribing 'Priya' as 'Priya' correctly but then substitutes wrong words in the same sentence. For example 'remind Priya about dentist' becomes 'remind Priya about tennis'. Happens maybe 1 in 4 times.",
-      attachmentData: null
-    }
-  ];
-
-  const events = [
-    // sub_001 events
-    { id: genId(), submissionId: 'sub_001', type: 'submission',  timestamp: submissions[0].submittedAt, repId: null, data: {} },
-    { id: genId(), submissionId: 'sub_001', type: 'auto_triage', timestamp: submissions[0].submittedAt, repId: null, data: { routedTo: 'tucker', reason: 'Software crash — routed to Tucker' } },
-    { id: genId(), submissionId: 'sub_001', type: 'claim',       timestamp: new Date(now - 11*86400000).toISOString(), repId: 'admin_tucker', data: {} },
-    { id: genId(), submissionId: 'sub_001', type: 'note',        timestamp: new Date(now - 10*86400000).toISOString(), repId: 'admin_tucker', data: { content: "Reproduced internally on dev unit — step 4 triggers a memory flush that can race with the boot sequence. Fix in progress for next firmware push." } },
-    { id: genId(), submissionId: 'sub_001', type: 'close',       timestamp: new Date(now - 9*86400000).toISOString(),  repId: 'admin_tucker', data: { note: 'Acknowledged. Fix queued for firmware v0.4.2.' } },
-
-    // sub_002 events
-    { id: genId(), submissionId: 'sub_002', type: 'submission',  timestamp: submissions[1].submittedAt, repId: null, data: {} },
-    { id: genId(), submissionId: 'sub_002', type: 'auto_triage', timestamp: submissions[1].submittedAt, repId: null, data: { routedTo: 'hendrik', reason: 'UX / feature avoidance — routed to Hendrik' } },
-
-    // sub_003 events
-    { id: genId(), submissionId: 'sub_003', type: 'submission',  timestamp: submissions[2].submittedAt, repId: null, data: {} },
-    { id: genId(), submissionId: 'sub_003', type: 'auto_triage', timestamp: submissions[2].submittedAt, repId: null, data: { routedTo: 'tucker', reason: 'Hardware overheating — routed to Tucker' } },
-    { id: genId(), submissionId: 'sub_003', type: 'claim',       timestamp: new Date(now - 7*86400000).toISOString(), repId: 'admin_tucker', data: {} },
-
-    // sub_004 events
-    { id: genId(), submissionId: 'sub_004', type: 'submission',  timestamp: submissions[3].submittedAt, repId: null, data: {} },
-    { id: genId(), submissionId: 'sub_004', type: 'auto_triage', timestamp: submissions[3].submittedAt, repId: null, data: { routedTo: null, reason: 'Installation / setup — review for routing' } },
-
-    // sub_005 events
-    { id: genId(), submissionId: 'sub_005', type: 'submission',  timestamp: submissions[4].submittedAt, repId: null, data: {} },
-    { id: genId(), submissionId: 'sub_005', type: 'auto_triage', timestamp: submissions[4].submittedAt, repId: null, data: { routedTo: 'tucker', reason: 'Voice recognition — routed to Tucker' } }
-  ];
-
   save(KEY_USERS,       users);
-  save(KEY_SUBMISSIONS, submissions);
-  save(KEY_EVENTS,      events);
+  save(KEY_SUBMISSIONS, []);
+  save(KEY_EVENTS,      []);
   localStorage.setItem(KEY_INIT, '1');
 }
 
@@ -295,7 +235,7 @@ const Auth = {
     const user  = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash && u.otpUsed);
     if (!user) return null;
     const session = { userId: user.id, role: user.role, expiresAt: Date.now() + 86400000 };
-    save(KEY_SESSION, session);
+    sessionSave(KEY_SESSION, session);
     return user;
   },
 
@@ -308,7 +248,7 @@ const Auth = {
     users[idx].otpUsed      = true;
     save(KEY_USERS, users);
     const session = { userId: users[idx].id, role: users[idx].role, expiresAt: Date.now() + 86400000 };
-    save(KEY_SESSION, session);
+    sessionSave(KEY_SESSION, session);
     return users[idx];
   },
 
@@ -318,18 +258,18 @@ const Auth = {
   },
 
   logout() {
-    localStorage.removeItem(KEY_SESSION);
+    sessionStorage.removeItem(KEY_SESSION);
   },
 
   currentUser() {
-    const session = load(KEY_SESSION, null);
+    const session = sessionLoad(KEY_SESSION, null);
     if (!session || Date.now() > session.expiresAt) return null;
     const users = load(KEY_USERS);
     return users.find(u => u.id === session.userId) || null;
   },
 
   currentSession() {
-    return load(KEY_SESSION, null);
+    return sessionLoad(KEY_SESSION, null);
   }
 };
 
