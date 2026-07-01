@@ -121,7 +121,7 @@ function renderLoginView() {
         <form class="login-form" id="admin-login-form" novalidate>
           <div class="field">
             <label class="field-label" for="a-email">Email address</label>
-            <input class="input" type="email" id="a-email" autocomplete="email" placeholder="your@howardai.us" required>
+            <input class="input" type="email" id="a-email" autocomplete="email" placeholder="you@howardai.us" required>
           </div>
           <div class="field">
             <label class="field-label" for="a-password">Password</label>

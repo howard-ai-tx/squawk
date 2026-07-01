@@ -147,21 +147,29 @@ async function seed() {
 
   const now = Date.now();
 
-  const hHash = await sha256('squawk2026');
-  const tHash = await sha256('squawk2026');
+  const hHash = await sha256('20265657');
+  const tHash = await sha256('20266759');
+  const jHash = await sha256('test');
 
   const users = [
     {
       id: 'admin_hendrik', name: 'Hendrik Van Geertruyden',
-      email: 'hvangeertruyden@icloud.com',
+      email: 'hvangeertruyden@howardai.us',
       passwordHash: hHash, role: 'admin',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
-      id: 'admin_tucker', name: 'Tucker',
-      email: 'tucker@howardai.us',
+      id: 'admin_tucker', name: 'Tucker Pate',
+      email: 'tpate@howardai.us',
       passwordHash: tHash, role: 'admin',
+      otp: null, otpUsed: true, serialNumber: null,
+      createdAt: new Date(now - 30*86400000).toISOString()
+    },
+    {
+      id: 'admin_jane', name: 'Jane Doe',
+      email: 'jdoe@howardai.us',
+      passwordHash: jHash, role: 'admin',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 30*86400000).toISOString()
     },
@@ -185,6 +193,20 @@ async function seed() {
       passwordHash: await sha256('priyapass'), role: 'bt',
       otp: null, otpUsed: true, serialNumber: null,
       createdAt: new Date(now - 7*86400000).toISOString()
+    },
+    {
+      id: 'bt_test1', name: 'Test User One',
+      email: 'testbt1@example.com',
+      passwordHash: null, role: 'bt',
+      otp: '482751', otpUsed: false, serialNumber: null,
+      createdAt: new Date(now - 1*86400000).toISOString()
+    },
+    {
+      id: 'bt_test2', name: 'Test User Two',
+      email: 'testbt2@example.com',
+      passwordHash: null, role: 'bt',
+      otp: '639204', otpUsed: false, serialNumber: null,
+      createdAt: new Date(now - 1*86400000).toISOString()
     }
   ];
 
