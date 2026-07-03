@@ -144,8 +144,28 @@ function shade(hex, percent) {
   return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
 }
 
+// Colors chosen for clear contrast against both a white surface and the
+// dark-mode surface (#1C1C1E) — mid-saturation, mid-lightness only.
+const COLOR_PALETTE = [
+  { name: 'Teal',    hex: '#0F7A6C' },
+  { name: 'Blue',    hex: '#2563EB' },
+  { name: 'Indigo',  hex: '#4F46E5' },
+  { name: 'Purple',  hex: '#9333EA' },
+  { name: 'Pink',    hex: '#DB2777' },
+  { name: 'Orange',  hex: '#EA580C' },
+  { name: 'Amber',   hex: '#B45309' },
+  { name: 'Emerald', hex: '#059669' }
+];
+
+function colorName(hex) {
+  const match = COLOR_PALETTE.find(c => c.hex.toLowerCase() === (hex || '').toLowerCase());
+  return match ? match.name : 'Custom';
+}
+
+const TEXT_SIZES = { small: 0.9, regular: 1, large: 1.15 };
+
 function applyAppearance(user) {
-  const settings = user?.settings || { primaryColor: '#0F7A6C', theme: 'light', textScale: 1 };
+  const settings = user?.settings || { primaryColor: '#0F7A6C', theme: 'light', textSize: 'regular' };
   const root = document.documentElement;
   root.style.setProperty('--brand', settings.primaryColor);
   root.style.setProperty('--brand-hover', shade(settings.primaryColor, -10));
@@ -154,7 +174,10 @@ function applyAppearance(user) {
   document.querySelectorAll('.bt-sidebar-logo img, .login-logo img').forEach(img => {
     img.src = settings.theme === 'dark' ? 'Squawk-logo-white-text.png' : 'Squawk-logo.png';
   });
-  document.body.style.fontSize = (16 * (settings.textScale || 1)) + 'px';
+  // Scales the whole rendered UI (not just a font-size) since most of the
+  // app is laid out in fixed px rather than rem, so a font-size alone
+  // wouldn't cascade into it.
+  document.documentElement.style.zoom = TEXT_SIZES[settings.textSize] || 1;
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
@@ -865,10 +888,14 @@ function renderSettings() {
       <h3 class="h3 mb-6">Appearance</h3>
 
       <div class="field mb-6">
-        <label class="field-label" for="set-color">Primary color</label>
-        <div class="flex items-center gap-3">
-          <input type="color" id="set-color" value="${s.primaryColor}" style="width:44px;height:44px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px;cursor:pointer">
-          <span class="caption text-tertiary">${s.primaryColor}</span>
+        <label class="field-label">Primary color <span class="caption text-tertiary" id="color-name-label">${colorName(s.primaryColor)}</span></label>
+        <div class="color-swatch-grid">
+          ${COLOR_PALETTE.map(c => `
+            <button type="button" class="color-swatch ${s.primaryColor.toLowerCase() === c.hex.toLowerCase() ? 'active' : ''}"
+              style="background:${c.hex}" data-hex="${c.hex}" data-name="${c.name}" aria-label="${c.name}" title="${c.name}">
+              <i class="ti ti-check" style="font-size:16px"></i>
+            </button>
+          `).join('')}
         </div>
       </div>
 
@@ -885,9 +912,12 @@ function renderSettings() {
       </div>
 
       <div class="field">
-        <label class="field-label" for="set-text-scale">Text size</label>
-        <input type="range" id="set-text-scale" min="0.85" max="1.3" step="0.05" value="${s.textScale}" style="width:100%">
-        <p class="body mt-4" id="text-scale-sample" style="font-size:${16 * s.textScale}px">Sample text — this is what your text will look like.</p>
+        <label class="field-label">Text size</label>
+        <div class="flex gap-2">
+          <button class="btn ${s.textSize === 'small' ? 'btn-brand' : 'btn-secondary'}" id="text-small-btn">Small</button>
+          <button class="btn ${s.textSize === 'regular' ? 'btn-brand' : 'btn-secondary'}" id="text-regular-btn">Regular</button>
+          <button class="btn ${s.textSize === 'large' ? 'btn-brand' : 'btn-secondary'}" id="text-large-btn">Large</button>
+        </div>
       </div>
     </div>
   `;
@@ -951,10 +981,12 @@ function renderSettings() {
     toast('Notification preferences saved.');
   });
 
-  document.getElementById('set-color').addEventListener('input', e => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { primaryColor: e.target.value });
-    applyAppearance(currentUser);
-    renderSettings();
+  document.querySelectorAll('.color-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentUser = DB.Users.updateSettings(currentUser.id, { primaryColor: btn.dataset.hex });
+      applyAppearance(currentUser);
+      renderSettings();
+    });
   });
 
   document.getElementById('theme-light-btn').addEventListener('click', () => {
@@ -968,11 +1000,20 @@ function renderSettings() {
     renderSettings();
   });
 
-  document.getElementById('set-text-scale').addEventListener('input', e => {
-    const scale = parseFloat(e.target.value);
-    document.getElementById('text-scale-sample').style.fontSize = (16 * scale) + 'px';
-    currentUser = DB.Users.updateSettings(currentUser.id, { textScale: scale });
+  document.getElementById('text-small-btn').addEventListener('click', () => {
+    currentUser = DB.Users.updateSettings(currentUser.id, { textSize: 'small' });
     applyAppearance(currentUser);
+    renderSettings();
+  });
+  document.getElementById('text-regular-btn').addEventListener('click', () => {
+    currentUser = DB.Users.updateSettings(currentUser.id, { textSize: 'regular' });
+    applyAppearance(currentUser);
+    renderSettings();
+  });
+  document.getElementById('text-large-btn').addEventListener('click', () => {
+    currentUser = DB.Users.updateSettings(currentUser.id, { textSize: 'large' });
+    applyAppearance(currentUser);
+    renderSettings();
   });
 }
 

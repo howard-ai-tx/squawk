@@ -170,7 +170,7 @@ function defaultSettings() {
     emailNotifications: true,
     primaryColor: '#0F7A6C',
     theme: 'light',
-    textScale: 1
+    textSize: 'regular'
   };
 }
 
