@@ -233,7 +233,8 @@ function renderRecordsTable() {
     const q = recordFilters.search;
     subs = subs.filter(s =>
       (s.bt?.name || '').toLowerCase().includes(q) ||
-      s.message.toLowerCase().includes(q) ||
+      (s.title || '').toLowerCase().includes(q) ||
+      (s.description || '').toLowerCase().includes(q) ||
       (DB.CATEGORIES[s.category]?.subcategories[s.subcategory] || '').toLowerCase().includes(q) ||
       (DB.CATEGORIES[s.category]?.label || '').toLowerCase().includes(q)
     );
@@ -264,10 +265,10 @@ function renderRecordsTable() {
           onkeydown="if(event.key==='Enter')showView('ticket',{id:'${s.id}'})"
           role="button" aria-label="Open ticket: ${escHtml(catLabel)} — ${escHtml(subLabel)}">
         <td>${formatDate(s.submittedAt)}</td>
-        <td class="font-bold">${escHtml(s.bt?.name || 'Unknown')}</td>
+        <td class="font-bold">${escHtml(s.title || '(untitled)')}</td>
+        <td class="text-secondary">${escHtml(s.bt?.name || 'Unknown')}</td>
         <td><span class="badge badge-cat">${escHtml(catLabel)}</span></td>
         <td class="text-secondary">${escHtml(subLabel)}</td>
-        <td>${severityBadge(s.severity)}</td>
         <td>${statusBadge(s.status)}</td>
         <td class="${s.owner ? '' : 'text-placeholder'}">${s.owner ? escHtml(s.owner.name) : 'Unassigned'}</td>
       </tr>
@@ -279,8 +280,8 @@ function renderRecordsTable() {
       <table>
         <thead>
           <tr>
-            <th>Date</th><th>Beta Tester</th><th>Category</th><th>Subcategory</th>
-            <th>Severity</th><th>Status</th><th>Assigned To</th>
+            <th>Date</th><th>Title</th><th>Beta Tester</th><th>Category</th><th>Subcategory</th>
+            <th>Status</th><th>Assigned To</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -320,20 +321,20 @@ function renderTicket(id) {
           ${statusBadge(status)}
           <span class="caption text-placeholder">#${id}</span>
         </div>
-        <h1 class="admin-page-title" style="font-size:28px">${escHtml(catLabel)} — ${escHtml(subLabel)}</h1>
-        <p class="admin-page-subtitle">Submitted by ${escHtml(bt?.name || 'Unknown')} on ${formatDate(sub.submittedAt)}</p>
+        <h1 class="admin-page-title" style="font-size:28px">${escHtml(sub.title || catLabel)}</h1>
+        <p class="admin-page-subtitle">${escHtml(catLabel)} — ${escHtml(subLabel)} · Submitted by ${escHtml(bt?.name || 'Unknown')} on ${formatDate(sub.submittedAt)}</p>
       </div>
       <div class="flex gap-2" id="ticket-actions"></div>
     </div>
 
     <div class="ticket-meta-grid mb-6">
       <div class="ticket-meta-item">
-        <p class="ticket-meta-label">Severity</p>
-        <p class="ticket-meta-value">${severityBadge(sub.severity)}</p>
+        <p class="ticket-meta-label">Howard Model</p>
+        <p class="ticket-meta-value">${escHtml(sub.model || 'Not specified')}</p>
       </div>
       <div class="ticket-meta-item">
-        <p class="ticket-meta-label">Interface</p>
-        <p class="ticket-meta-value">${DB.INTERFACES[sub.interface] || sub.interface}</p>
+        <p class="ticket-meta-label">Event Timestamp</p>
+        <p class="ticket-meta-value">${sub.eventTimestamp ? `${formatDateTime(sub.eventTimestamp)} (${sub.timestampPrecision || 'exact'})` : 'Not specified'}</p>
       </div>
       <div class="ticket-meta-item">
         <p class="ticket-meta-label">Assigned To</p>
@@ -355,7 +356,7 @@ function renderTicket(id) {
       <div>
         <div class="card" style="position:sticky;top:var(--space-8)">
           <h4 class="h4 mb-4">Original Submission</h4>
-          <p class="body" style="white-space:pre-wrap;color:var(--text-secondary);font-size:14px">${escHtml(sub.message)}</p>
+          <p class="body" style="white-space:pre-wrap;color:var(--text-secondary);font-size:14px">${escHtml(sub.description || '')}</p>
           ${sub.attachmentData ? `
             <hr class="divider" style="margin:var(--space-4) 0">
             <p class="caption text-tertiary mb-2">Attachment</p>
@@ -763,12 +764,6 @@ function statusBadge(status) {
   const map = { new: ['badge-new','New'], 'in-review': ['badge-review','In Review'], closed: ['badge-closed','Closed'] };
   const [cls, label] = map[status] || ['badge-new', status];
   return `<span class="badge ${cls}">${label}</span>`;
-}
-
-function severityBadge(sev) {
-  const map = { low: 'badge-low', medium: 'badge-medium', high: 'badge-high' };
-  const label = DB.SEVERITIES[sev] || sev;
-  return `<span class="badge ${map[sev]||'badge-low'}">${label}</span>`;
 }
 
 function formatDate(iso) {

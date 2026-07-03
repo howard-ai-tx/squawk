@@ -16,25 +16,70 @@
   <div data-view="login"></div>
 
   <!-- Authenticated shell -->
-  <div class="bt-shell" id="bt-authenticated" style="display:flex;flex-direction:column">
-    <nav class="bt-nav" id="bt-nav">
-      <div class="bt-nav-inner">
-        <div class="bt-nav-logo">
-          <img src="Squawk-logo.png" alt="Squawk by Howard AI">
-        </div>
-        <ul class="bt-nav-links" role="list">
-          <li><a data-target="submit" role="button" tabindex="0">Submit Feedback</a></li>
-          <li><a data-target="my-submissions" role="button" tabindex="0">My Submissions</a></li>
-        </ul>
-        <button class="btn btn-secondary btn-sm" id="btn-signout">Sign Out</button>
+  <div class="bt-shell hidden" id="bt-authenticated">
+    <button class="bt-sidebar-toggle" id="bt-sidebar-toggle" aria-label="Open navigation">
+      <i class="ti ti-layout-sidebar-left-expand" style="font-size:24px" aria-hidden="true"></i>
+    </button>
+
+    <div class="bt-sidebar-overlay" id="bt-sidebar-overlay"></div>
+
+    <aside class="bt-sidebar" id="bt-sidebar">
+      <div class="bt-sidebar-logo">
+        <img src="Squawk-logo.png" alt="Squawk by Howard AI" id="bt-sidebar-logo-img">
       </div>
-    </nav>
+      <nav class="bt-nav" id="bt-nav" aria-label="Main navigation">
+        <button class="bt-nav-item" data-target="dashboard">
+          <i class="ti ti-layout-dashboard" style="font-size:20px" aria-hidden="true"></i>
+          Dashboard
+        </button>
+        <div class="bt-nav-divider"></div>
+        <button class="bt-nav-item" data-target="new">
+          <i class="ti ti-square-rounded-plus" style="font-size:20px" aria-hidden="true"></i>
+          New
+        </button>
+        <button class="bt-nav-item" data-target="drafts">
+          <i class="ti ti-file-pencil" style="font-size:20px" aria-hidden="true"></i>
+          Drafts
+        </button>
+        <button class="bt-nav-item" data-target="submitted">
+          <i class="ti ti-checklist" style="font-size:20px" aria-hidden="true"></i>
+          Submitted
+        </button>
+        <div class="bt-nav-divider"></div>
+        <button class="bt-nav-item" data-target="messages">
+          <i class="ti ti-message-2" style="font-size:20px" aria-hidden="true"></i>
+          Messages
+        </button>
+        <button class="bt-nav-item" data-target="news">
+          <i class="ti ti-news" style="font-size:20px" aria-hidden="true"></i>
+          News
+        </button>
+        <button class="bt-nav-item" data-target="settings">
+          <i class="ti ti-settings" style="font-size:20px" aria-hidden="true"></i>
+          Settings
+        </button>
+      </nav>
+
+      <div class="bt-sidebar-footer" id="bt-sidebar-footer">
+        <div class="bt-sidebar-user" id="bt-sidebar-user-btn" data-target="settings">
+          <div class="bt-avatar" id="bt-sidebar-avatar"></div>
+          <span class="bt-sidebar-username" id="bt-sidebar-username"></span>
+        </div>
+        <button class="btn-icon" id="btn-signout" aria-label="Sign out">
+          <i class="ti ti-logout" style="font-size:20px" aria-hidden="true"></i>
+        </button>
+      </div>
+    </aside>
 
     <main class="bt-main">
-      <div data-view="submit"></div>
-      <div data-view="my-submissions"></div>
+      <div data-view="dashboard"></div>
+      <div data-view="new"></div>
+      <div data-view="drafts"></div>
+      <div data-view="submitted"></div>
       <div data-view="submission-detail"></div>
-      <div data-view="confirm"></div>
+      <div data-view="messages"></div>
+      <div data-view="news"></div>
+      <div data-view="settings"></div>
     </main>
   </div>
 

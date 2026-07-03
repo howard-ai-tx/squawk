@@ -7,87 +7,97 @@ const CATEGORIES = {
     label: 'Hardware',
     icon: 'ti-cpu',
     subcategories: {
-      malfunction:      'Malfunction',
-      wont_power_on:    "Won't Power On",
-      overheating:      'Overheating',
-      physical_damage:  'Physical Damage',
-      connectivity:     'Connectivity Issue',
-      other:            'Other'
+      wont_power_on:   "Won't power on",
+      overheating:     'Overheating / thermal shutdown',
+      physical_damage: 'Physical damage (port, casing, cable)',
+      led_issue:       'LED / indicator light issue',
+      connectivity:    'Network / ethernet connectivity',
+      peripheral:      'Peripheral not recognized',
+      restarts:        'Unit restarts unexpectedly',
+      other:           'Other hardware'
     }
   },
   software: {
     label: 'Software / Arken',
     icon: 'ti-code',
     subcategories: {
-      crash:              'Crash',
-      sluggish:           'Sluggish Performance',
-      cache:              'Cache Issue',
-      unexpected_behavior:'Unexpected Behavior',
-      feature_broken:     'Feature Not Working',
-      update_issue:       'Update Issue',
-      other:              'Other'
+      crash:              'Crash / fatal error',
+      unexpected_behavior: 'Unexpected behavior',
+      cache_memory:        'Cache / memory issue',
+      sluggish:            'Sluggish performance',
+      task_not_executing:  'Task not executing correctly',
+      setup_failure:       'Arken setup failure',
+      integration:         'Integration not working (calendar, email, etc.)',
+      health_monitoring:   'Auto-repair / health monitoring issue',
+      memory_loss:         'Memory / context loss (anti-amnesia)',
+      trust_score:         'Trust score / permission scoping issue',
+      other:               'Other software'
     }
   },
-  ux: {
-    label: 'UX / Confusion',
+  usability: {
+    label: 'Usability',
     icon: 'ti-layout',
     subcategories: {
-      unclear_instructions: 'Unclear Instructions',
-      confusing_flow:       'Confusing Flow',
-      feature_avoidance:    'Feature Avoidance',
-      missing_feature:      'Missing Feature',
-      unexpected_ui:        'Unexpected UI Behavior',
-      other:                'Other'
+      setup_unclear:      'Setup step unclear or confusing',
+      instructions_vague: 'Instructions vague or missing',
+      too_complex:        'Feature too complex to use',
+      intimidating:       'Feature feels intimidating / avoided entirely',
+      mobile_ui:          'Mobile app interface issue',
+      onboarding:         'Onboarding flow confusion',
+      terminology:        'Terminology unclear',
+      other:              'Other usability'
     }
   },
-  setup: {
-    label: 'Installation / Setup',
-    icon: 'ti-settings',
+  bugs: {
+    label: 'Bugs',
+    icon: 'ti-bug',
     subcategories: {
-      setup_failure:     'Setup Failure',
-      step_unclear:      'Step Unclear',
-      connection_problem:'Connection Problem',
-      config_error:      'Configuration Error',
-      other:             'Other'
+      repeated_incorrect: 'Repeated incorrect output',
+      inconsistent:       'Feature works inconsistently',
+      partial_completion: 'Task completes partially but not fully',
+      incorrect_data:     'Incorrect data pulled or referenced',
+      ui_broken:          'UI element broken or unresponsive',
+      other:              'Other bug'
     }
   },
-  voice: {
-    label: 'Voice Recognition',
-    icon: 'ti-microphone',
+  speed: {
+    label: 'Speed',
+    icon: 'ti-gauge',
     subcategories: {
-      misrecognition: 'Misrecognition',
-      no_response:    'No Response',
-      slow_response:  'Slow Response',
-      accent_issue:   'Language / Accent Issue',
-      other:          'Other'
+      response_slow: 'Response time too slow',
+      task_delayed:  'Task execution delayed',
+      app_slow_load: 'App / interface loads slowly',
+      voice_lag:     'Voice response lag',
+      other:         'Other speed'
     }
   },
-  suggestion: {
-    label: 'Feature Suggestion',
+  features: {
+    label: 'Features',
     icon: 'ti-bulb',
     subcategories: {
-      new_feature:  'New Feature Request',
-      enhancement:  'Enhancement Request',
-      other:        'Other'
+      missing_entirely: 'Feature missing entirely',
+      not_as_expected:  "Feature doesn't work as expected",
+      suggestion:       'Feature request / suggestion',
+      spending_limited: 'Spending controls too limited',
+      plugin_issue:     'Skill or plugin issue',
+      other:            'Other feature feedback'
     }
   },
-  other: {
-    label: 'Other',
-    icon: 'ti-dots-circle-horizontal',
+  security: {
+    label: 'Security',
+    icon: 'ti-shield-lock',
     subcategories: {
-      general:  'General Feedback',
-      positive: 'Positive Feedback',
-      other:    'Other'
+      suspicious_activity: 'Suspicious activity detected',
+      privacy_audit:       'Privacy audit concern',
+      data_classification: 'Data classification concern (sensitive data routed unexpectedly)',
+      unauthorized_access: 'Unauthorized access concern',
+      threat_detection:    'Threat detection alert',
+      other:               'Other security'
     }
   }
 };
 
-const INTERFACES = {
-  website:          'Website',
-  arken:            'Arken',
-  howard_messaging: 'Howard via Text / Messaging',
-  other:            'Other'
-};
+const HOWARD_MODELS = ['Arken One', 'Arken Mini', 'Arken Pro', 'Other'];
 
 const SEVERITIES = {
   low:    'Low',
@@ -96,15 +106,15 @@ const SEVERITIES = {
 };
 
 const REPS = {
-  tucker:  { name: 'Tucker',  categories: ['hardware', 'software'] },
-  hendrik: { name: 'Hendrik', categories: ['ux', 'suggestion']     }
+  tucker:  { name: 'Tucker',  categories: ['hardware', 'software', 'speed', 'bugs'] },
+  hendrik: { name: 'Hendrik', categories: ['usability', 'features', 'security']     }
 };
 
 // ─── ROUTING LOGIC ───────────────────────────────────────────────────────────
 
 function getRoutedRep(category) {
-  if (['hardware', 'software'].includes(category)) return 'tucker';
-  if (['ux', 'suggestion'].includes(category))     return 'hendrik';
+  if (['hardware', 'software', 'speed', 'bugs'].includes(category)) return 'tucker';
+  if (['usability', 'features', 'security'].includes(category))    return 'hendrik';
   return null;
 }
 
@@ -132,9 +142,10 @@ function genOTP() {
 
 const KEY_USERS       = 'squawk_users';
 const KEY_SUBMISSIONS = 'squawk_submissions';
+const KEY_DRAFTS      = 'squawk_drafts';
 const KEY_EVENTS      = 'squawk_events';
 const KEY_SESSION     = 'squawk_session';
-const KEY_INIT        = 'squawk_initialized_v4';
+const KEY_INIT        = 'squawk_initialized_v5';
 
 function load(key, fallback = []) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
@@ -154,6 +165,15 @@ function save(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function defaultSettings() {
+  return {
+    emailNotifications: true,
+    primaryColor: '#0F7A6C',
+    theme: 'light',
+    textScale: 1
+  };
+}
+
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
 
 function seed() {
@@ -166,62 +186,87 @@ function seed() {
       id: 'admin_hendrik', name: 'Hendrik Van Geertruyden',
       email: 'hvangeertruyden@howardai.us',
       passwordHash: hashPassword('20265657'), role: 'admin',
-      otp: null, otpUsed: true, serialNumber: null,
+      otp: null, otpUsed: true, devices: [], avatarDataUrl: null,
+      settings: defaultSettings(),
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
       id: 'admin_tucker', name: 'Tucker Pate',
       email: 'tpate@howardai.us',
       passwordHash: hashPassword('20266759'), role: 'admin',
-      otp: null, otpUsed: true, serialNumber: null,
+      otp: null, otpUsed: true, devices: [], avatarDataUrl: null,
+      settings: defaultSettings(),
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
       id: 'admin_jane', name: 'Jane Doe',
       email: 'jdoe@howardai.us',
       passwordHash: hashPassword('test'), role: 'admin',
-      otp: null, otpUsed: true, serialNumber: null,
+      otp: null, otpUsed: true, devices: [], avatarDataUrl: null,
+      settings: defaultSettings(),
       createdAt: new Date(now - 30*86400000).toISOString()
     },
     {
       id: 'bt_alice', name: 'Alice Chen',
       email: 'alice@example.com',
       passwordHash: hashPassword('alicepass'), role: 'bt',
-      otp: null, otpUsed: true, serialNumber: null,
+      otp: null, otpUsed: true, avatarDataUrl: null,
+      devices: [
+        { id: 'dev_' + genId(), name: "Alice's Arken", serialNumber: 'ARK-10293', model: 'Arken One', dateAdded: new Date(now - 14*86400000).toISOString() }
+      ],
+      settings: defaultSettings(),
       createdAt: new Date(now - 14*86400000).toISOString()
     },
     {
       id: 'bt_marcus', name: 'Marcus Webb',
       email: 'marcus@example.com',
       passwordHash: hashPassword('marcuspass'), role: 'bt',
-      otp: null, otpUsed: true, serialNumber: null,
+      otp: null, otpUsed: true, avatarDataUrl: null,
+      devices: [
+        { id: 'dev_' + genId(), name: 'Home Unit',   serialNumber: 'ARK-20194', model: 'Arken One',  dateAdded: new Date(now - 10*86400000).toISOString() },
+        { id: 'dev_' + genId(), name: 'Office Unit', serialNumber: 'ARK-20551', model: 'Arken Mini', dateAdded: new Date(now - 3*86400000).toISOString() }
+      ],
+      settings: defaultSettings(),
       createdAt: new Date(now - 10*86400000).toISOString()
     },
     {
       id: 'bt_priya', name: 'Priya Nair',
       email: 'priya@example.com',
       passwordHash: hashPassword('priyapass'), role: 'bt',
-      otp: null, otpUsed: true, serialNumber: null,
+      otp: null, otpUsed: true, avatarDataUrl: null,
+      devices: [
+        { id: 'dev_' + genId(), name: "Priya's Arken", serialNumber: 'ARK-30871', model: 'Arken Pro', dateAdded: new Date(now - 7*86400000).toISOString() }
+      ],
+      settings: defaultSettings(),
       createdAt: new Date(now - 7*86400000).toISOString()
     },
     {
       id: 'bt_test1', name: 'Test User One',
       email: 'testbt1@example.com',
       passwordHash: null, role: 'bt',
-      otp: '482751', otpUsed: false, serialNumber: null,
+      otp: '482751', otpUsed: false, avatarDataUrl: null,
+      devices: [
+        { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST01', model: 'Arken One', dateAdded: new Date(now - 1*86400000).toISOString() }
+      ],
+      settings: defaultSettings(),
       createdAt: new Date(now - 1*86400000).toISOString()
     },
     {
       id: 'bt_test2', name: 'Test User Two',
       email: 'testbt2@example.com',
       passwordHash: null, role: 'bt',
-      otp: '639204', otpUsed: false, serialNumber: null,
+      otp: '639204', otpUsed: false, avatarDataUrl: null,
+      devices: [
+        { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST02', model: 'Arken One', dateAdded: new Date(now - 1*86400000).toISOString() }
+      ],
+      settings: defaultSettings(),
       createdAt: new Date(now - 1*86400000).toISOString()
     }
   ];
 
   save(KEY_USERS,       users);
   save(KEY_SUBMISSIONS, []);
+  save(KEY_DRAFTS,      []);
   save(KEY_EVENTS,      []);
   localStorage.setItem(KEY_INIT, '1');
 }
@@ -281,6 +326,49 @@ const Users = {
   getAdmins()    { return load(KEY_USERS).filter(u => u.role === 'admin'); },
   getById(id)    { return load(KEY_USERS).find(u => u.id === id) || null; },
 
+  update(id, patch) {
+    const users = load(KEY_USERS);
+    const idx   = users.findIndex(u => u.id === id);
+    if (idx === -1) return null;
+    users[idx] = { ...users[idx], ...patch };
+    save(KEY_USERS, users);
+    return users[idx];
+  },
+
+  updateSettings(id, patch) {
+    const users = load(KEY_USERS);
+    const idx   = users.findIndex(u => u.id === id);
+    if (idx === -1) return null;
+    users[idx].settings = { ...defaultSettings(), ...users[idx].settings, ...patch };
+    save(KEY_USERS, users);
+    return users[idx];
+  },
+
+  addDevice(userId, device) {
+    const users = load(KEY_USERS);
+    const idx   = users.findIndex(u => u.id === userId);
+    if (idx === -1) return null;
+    const dev = { id: 'dev_' + genId(), ...device };
+    users[idx].devices = users[idx].devices || [];
+    users[idx].devices.push(dev);
+    save(KEY_USERS, users);
+    return dev;
+  },
+
+  removeDevice(userId, deviceId) {
+    const users = load(KEY_USERS);
+    const idx   = users.findIndex(u => u.id === userId);
+    if (idx === -1) return null;
+    users[idx].devices = (users[idx].devices || []).filter(d => d.id !== deviceId);
+    save(KEY_USERS, users);
+    return users[idx];
+  },
+
+  deleteAccount(id) {
+    const users = load(KEY_USERS).filter(u => u.id !== id);
+    save(KEY_USERS, users);
+  },
+
   create({ name, email }) {
     const users = load(KEY_USERS);
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
@@ -294,13 +382,47 @@ const Users = {
       role: 'bt',
       otp,
       otpUsed: false,
-      serialNumber: null,
+      devices: [],
+      avatarDataUrl: null,
+      settings: defaultSettings(),
       createdAt: new Date().toISOString(),
       createdBy: Auth.currentSession()?.userId || null
     };
     users.push(user);
     save(KEY_USERS, users);
     return { user, otp };
+  }
+};
+
+// ─── DRAFTS ───────────────────────────────────────────────────────────────────
+
+const Drafts = {
+  getByBT(id) {
+    return load(KEY_DRAFTS).filter(d => d.btId === id)
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  },
+
+  getById(id) { return load(KEY_DRAFTS).find(d => d.id === id) || null; },
+
+  save(draft) {
+    const drafts = load(KEY_DRAFTS);
+    const now    = new Date().toISOString();
+    if (draft.id) {
+      const idx = drafts.findIndex(d => d.id === draft.id);
+      if (idx !== -1) {
+        drafts[idx] = { ...drafts[idx], ...draft, updatedAt: now };
+        save(KEY_DRAFTS, drafts);
+        return drafts[idx];
+      }
+    }
+    const newDraft = { ...draft, id: 'draft_' + genId(), updatedAt: now, createdAt: now };
+    drafts.push(newDraft);
+    save(KEY_DRAFTS, drafts);
+    return newDraft;
+  },
+
+  delete(id) {
+    save(KEY_DRAFTS, load(KEY_DRAFTS).filter(d => d.id !== id));
   }
 };
 
@@ -311,14 +433,16 @@ const Submissions = {
   getByBT(id)  { return load(KEY_SUBMISSIONS).filter(s => s.btId === id); },
   getById(id)  { return load(KEY_SUBMISSIONS).find(s => s.id === id) || null; },
 
-  create({ btId, category, subcategory, interface: iface, severity, message, attachmentData }) {
+  create({ btId, title, category, subcategory, description, deviceId, model, eventTimestamp, timestampPrecision, attachmentData }) {
     const sub = {
       id:             'sub_' + genId(),
       btId,
       submittedAt:    new Date().toISOString(),
-      category, subcategory,
-      interface:      iface,
-      severity, message,
+      title, category, subcategory, description,
+      deviceId: deviceId || null,
+      model:    model || null,
+      eventTimestamp:     eventTimestamp || null,
+      timestampPrecision: timestampPrecision || null,
       attachmentData: attachmentData || null
     };
     const subs = load(KEY_SUBMISSIONS);
@@ -469,4 +593,4 @@ const Dashboard = {
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, Users, Submissions, Events, Dashboard, CATEGORIES, INTERFACES, SEVERITIES, REPS, seed };
+window.DB = { Auth, Users, Drafts, Submissions, Events, Dashboard, CATEGORIES, HOWARD_MODELS, SEVERITIES, REPS, seed };
