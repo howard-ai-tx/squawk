@@ -65,7 +65,7 @@ function toast(message, type = 'success') {
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 
-function openModal({ title, body, footer, onClose }) {
+function openModal({ title, body, footer, onClose, noDismiss = false }) {
   closeModal();
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -74,7 +74,7 @@ function openModal({ title, body, footer, onClose }) {
     <div class="modal" id="active-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-header">
         <h3 class="modal-title" id="modal-title">${title}</h3>
-        <button class="btn-icon" id="modal-close-btn" aria-label="Close modal"><i class="ti ti-x" style="font-size:20px"></i></button>
+        ${noDismiss ? '' : `<button class="btn-icon" id="modal-close-btn" aria-label="Close modal"><i class="ti ti-x" style="font-size:20px"></i></button>`}
       </div>
       <div class="modal-body">${body}</div>
       <div class="modal-footer">${footer}</div>
@@ -82,8 +82,10 @@ function openModal({ title, body, footer, onClose }) {
   `;
   document.body.appendChild(overlay);
   modalCloseCallback = onClose;
-  document.getElementById('modal-close-btn').addEventListener('click', closeModal);
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.getElementById('modal-close-btn')?.addEventListener('click', closeModal);
+  if (!noDismiss) {
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  }
   document.addEventListener('keydown', escListener);
 }
 
@@ -111,6 +113,24 @@ function confirmModal(title, message, confirmLabel = 'Confirm') {
     });
     document.getElementById('cm-confirm').addEventListener('click', () => { modalCloseCallback = () => resolve(true); closeModal(); });
     document.getElementById('cm-cancel').addEventListener('click', () => closeModal());
+  });
+}
+
+// IDL confirmation modal (7c.iii): used exclusively before destructive actions.
+// No close button, no overlay dismissal — the user must choose Cancel or the
+// named destructive action.
+function confirmDestructive(title, message, destructiveLabel) {
+  return new Promise(resolve => {
+    openModal({
+      title,
+      body: `<p class="body">${message}</p>`,
+      footer: `<button class="btn btn-secondary" id="cd-cancel">Cancel</button>
+               <button class="btn btn-destructive" id="cd-confirm">${destructiveLabel}</button>`,
+      onClose: () => resolve(false),
+      noDismiss: true
+    });
+    document.getElementById('cd-confirm').addEventListener('click', () => { modalCloseCallback = () => resolve(true); closeModal(); });
+    document.getElementById('cd-cancel').addEventListener('click', () => closeModal());
   });
 }
 
@@ -620,7 +640,7 @@ function renderDrafts() {
         </div>
         <div class="draft-item-actions">
           <button class="btn-icon" aria-label="Edit draft" onclick="showView('new',{draftId:'${d.id}'})"><i class="ti ti-pencil" style="font-size:18px"></i></button>
-          <button class="btn-icon" aria-label="Delete draft" onclick="handleDeleteDraft('${d.id}')"><i class="ti ti-trash" style="font-size:18px"></i></button>
+          <button class="btn-icon" aria-label="Delete draft" onclick="handleDeleteDraft('${d.id}', '${escJs(d.title || 'this draft')}')"><i class="ti ti-trash" style="font-size:18px"></i></button>
         </div>
       </div>
     `;
@@ -629,8 +649,12 @@ function renderDrafts() {
   view.innerHTML = `<h2 class="h2 mb-6">Drafts</h2>${items}`;
 }
 
-async function handleDeleteDraft(id) {
-  const ok = await confirmModal('Delete this draft?', 'This cannot be undone.', 'Delete');
+async function handleDeleteDraft(id, title) {
+  const ok = await confirmDestructive(
+    `Delete "${escHtml(title)}"?`,
+    'This action cannot be undone. This draft will be permanently removed.',
+    'Delete Draft'
+  );
   if (!ok) return;
   DB.Drafts.delete(id);
   toast('Draft deleted.');
@@ -813,14 +837,14 @@ function renderSettings() {
             <p class="draft-item-meta">${escHtml(d.model)} · Serial ${escHtml(d.serialNumber)} · Added ${formatDate(d.dateAdded)}</p>
           </div>
           <div class="draft-item-actions">
-            <button class="btn-icon" aria-label="Remove unit" onclick="handleRemoveDevice('${d.id}')"><i class="ti ti-trash" style="font-size:18px"></i></button>
+            <button class="btn-icon" aria-label="Remove unit" onclick="handleRemoveDevice('${d.id}', '${escJs(d.name)}')"><i class="ti ti-trash" style="font-size:18px"></i></button>
           </div>
         </div>
       `).join('') : `<p class="body text-tertiary mb-4">No Howard units linked yet.</p>`}
 
       <hr class="divider mt-6 mb-6">
 
-      <button class="btn btn-secondary" id="delete-account-btn" style="color:var(--error)">Delete Account</button>
+      <button class="btn btn-destructive" id="delete-account-btn">Delete Account</button>
     </div>
 
     <div class="card mb-6">
@@ -908,7 +932,11 @@ function renderSettings() {
   document.getElementById('add-device-btn').addEventListener('click', showAddDeviceModal);
 
   document.getElementById('delete-account-btn').addEventListener('click', async () => {
-    const ok = await confirmModal('Delete your account?', 'This permanently deletes your account. Your past submissions will remain on record. This cannot be undone.', 'Delete Account');
+    const ok = await confirmDestructive(
+      `Delete your account, ${escHtml(currentUser.name)}?`,
+      'This action cannot be undone. Your account will be permanently removed. Your past submissions will remain on record.',
+      'Delete Account'
+    );
     if (!ok) return;
     DB.Users.deleteAccount(currentUser.id);
     DB.Auth.logout();
@@ -1004,7 +1032,13 @@ function showAddDeviceModal() {
   });
 }
 
-function handleRemoveDevice(deviceId) {
+async function handleRemoveDevice(deviceId, deviceName) {
+  const ok = await confirmDestructive(
+    `Remove "${escHtml(deviceName)}"?`,
+    'This action cannot be undone. This Howard unit will no longer be linked to your account.',
+    'Remove Howard Unit'
+  );
+  if (!ok) return;
   DB.Users.removeDevice(currentUser.id, deviceId);
   currentUser = DB.Users.getById(currentUser.id);
   toast('Howard unit removed.');
@@ -1021,6 +1055,11 @@ function formatDate(iso) {
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escJs(str) {
+  if (!str) return '';
+  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
