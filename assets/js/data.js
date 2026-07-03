@@ -177,7 +177,7 @@ function defaultSettings() {
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
 
 function seed() {
-  if (localStorage.getItem(KEY_INIT)) return;
+  if (localStorage.getItem(KEY_INIT)) { patchSeed(); return; }
 
   const now = Date.now();
 
@@ -261,6 +261,20 @@ function seed() {
       ],
       settings: defaultSettings(),
       createdAt: new Date(now - 1*86400000).toISOString()
+    },
+    {
+      // Pre-activated on purpose (unlike bt_test1/bt_test2) so it logs in
+      // identically on any device without an OTP first-login step — useful
+      // for cross-device testing.
+      id: 'bt_test3', name: 'Test User Three',
+      email: 'testbt3@example.com',
+      passwordHash: hashPassword('testbt3pass'), role: 'bt',
+      otp: null, otpUsed: true, avatarDataUrl: null,
+      devices: [
+        { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST03', model: 'Arken One', dateAdded: new Date(now - 1*86400000).toISOString() }
+      ],
+      settings: defaultSettings(),
+      createdAt: new Date(now - 1*86400000).toISOString()
     }
   ];
 
@@ -269,6 +283,26 @@ function seed() {
   save(KEY_DRAFTS,      []);
   save(KEY_EVENTS,      []);
   localStorage.setItem(KEY_INIT, '1');
+}
+
+// Adds new fixed-credential seed accounts to already-initialized browsers
+// without touching real submissions/drafts/events already stored there.
+function patchSeed() {
+  const users = load(KEY_USERS);
+  if (users.some(u => u.id === 'bt_test3')) return;
+
+  users.push({
+    id: 'bt_test3', name: 'Test User Three',
+    email: 'testbt3@example.com',
+    passwordHash: hashPassword('testbt3pass'), role: 'bt',
+    otp: null, otpUsed: true, avatarDataUrl: null,
+    devices: [
+      { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST03', model: 'Arken One', dateAdded: new Date().toISOString() }
+    ],
+    settings: defaultSettings(),
+    createdAt: new Date().toISOString()
+  });
+  save(KEY_USERS, users);
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
