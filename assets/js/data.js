@@ -110,518 +110,256 @@ const REPS = {
   hendrik: { name: 'Hendrik', categories: ['usability', 'features', 'security']     }
 };
 
-// ─── ROUTING LOGIC ───────────────────────────────────────────────────────────
-
 function getRoutedRep(category) {
   if (['hardware', 'software', 'speed', 'bugs'].includes(category)) return 'tucker';
   if (['usability', 'features', 'security'].includes(category))    return 'hendrik';
   return null;
 }
 
-// ─── CRYPTO ──────────────────────────────────────────────────────────────────
+// ─── API CLIENT ──────────────────────────────────────────────────────────────
 
-function hashPassword(str) {
-  // Simple deterministic obfuscation for localStorage-only tool
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
+const API_BASE   = 'https://squawk-api.hvangeertruyden.workers.dev';
+const KEY_TOKEN  = 'squawk_session_token';
+const KEY_LOCAL_MIGRATION_DONE = 'squawk_local_migration_done';
+
+function getToken() {
+  return sessionStorage.getItem(KEY_TOKEN);
+}
+
+function setToken(token) {
+  if (token) sessionStorage.setItem(KEY_TOKEN, token);
+  else sessionStorage.removeItem(KEY_TOKEN);
+}
+
+async function api(path, { method = 'GET', body, auth = true } = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth) {
+    const token = getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
   }
-  return btoa(str + ':sq:' + h.toString(16));
+  const res = await fetch(API_BASE + path, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* no body */ }
+  if (!res.ok) {
+    const err = new Error(data?.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
 }
 
-function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
-
-function genOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// ─── RAW STORAGE ─────────────────────────────────────────────────────────────
-
-const KEY_USERS       = 'squawk_users';
-const KEY_SUBMISSIONS = 'squawk_submissions';
-const KEY_DRAFTS      = 'squawk_drafts';
-const KEY_EVENTS      = 'squawk_events';
-const KEY_SESSION     = 'squawk_session';
-const KEY_INIT        = 'squawk_initialized_v5';
-
-function load(key, fallback = []) {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-}
-
-function sessionLoad(key, fallback = null) {
-  try { return JSON.parse(sessionStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-}
-
-function sessionSave(key, value) {
-  sessionStorage.setItem(key, JSON.stringify(value));
-}
-
-function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function defaultSettings() {
-  return {
-    emailNotifications: true,
-    primaryColor: '#0F7A6C',
-    theme: 'light',
-    textSize: 'regular'
-  };
-}
-
-// ─── SEED DATA ────────────────────────────────────────────────────────────────
+// ─── SEED (no-op placeholder; data now lives in the Cloudflare backend) ─────
 
 function seed() {
-  if (localStorage.getItem(KEY_INIT)) { patchSeed(); return; }
-
-  const now = Date.now();
-
-  const users = [
-    {
-      id: 'admin_hendrik', name: 'Hendrik Van Geertruyden',
-      email: 'hvangeertruyden@howardai.us',
-      passwordHash: hashPassword('20265657'), role: 'admin',
-      otp: null, otpUsed: true, devices: [], avatarDataUrl: null,
-      settings: defaultSettings(),
-      createdAt: new Date(now - 30*86400000).toISOString()
-    },
-    {
-      id: 'admin_tucker', name: 'Tucker Pate',
-      email: 'tpate@howardai.us',
-      passwordHash: hashPassword('20266759'), role: 'admin',
-      otp: null, otpUsed: true, devices: [], avatarDataUrl: null,
-      settings: defaultSettings(),
-      createdAt: new Date(now - 30*86400000).toISOString()
-    },
-    {
-      id: 'admin_jane', name: 'Jane Doe',
-      email: 'jdoe@howardai.us',
-      passwordHash: hashPassword('test'), role: 'admin',
-      otp: null, otpUsed: true, devices: [], avatarDataUrl: null,
-      settings: defaultSettings(),
-      createdAt: new Date(now - 30*86400000).toISOString()
-    },
-    {
-      id: 'bt_alice', name: 'Alice Chen',
-      email: 'alice@example.com',
-      passwordHash: hashPassword('alicepass'), role: 'bt',
-      otp: null, otpUsed: true, avatarDataUrl: null,
-      devices: [
-        { id: 'dev_' + genId(), name: "Alice's Arken", serialNumber: 'ARK-10293', model: 'Arken One', dateAdded: new Date(now - 14*86400000).toISOString() }
-      ],
-      settings: defaultSettings(),
-      createdAt: new Date(now - 14*86400000).toISOString()
-    },
-    {
-      id: 'bt_marcus', name: 'Marcus Webb',
-      email: 'marcus@example.com',
-      passwordHash: hashPassword('marcuspass'), role: 'bt',
-      otp: null, otpUsed: true, avatarDataUrl: null,
-      devices: [
-        { id: 'dev_' + genId(), name: 'Home Unit',   serialNumber: 'ARK-20194', model: 'Arken One',  dateAdded: new Date(now - 10*86400000).toISOString() },
-        { id: 'dev_' + genId(), name: 'Office Unit', serialNumber: 'ARK-20551', model: 'Arken Mini', dateAdded: new Date(now - 3*86400000).toISOString() }
-      ],
-      settings: defaultSettings(),
-      createdAt: new Date(now - 10*86400000).toISOString()
-    },
-    {
-      id: 'bt_priya', name: 'Priya Nair',
-      email: 'priya@example.com',
-      passwordHash: hashPassword('priyapass'), role: 'bt',
-      otp: null, otpUsed: true, avatarDataUrl: null,
-      devices: [
-        { id: 'dev_' + genId(), name: "Priya's Arken", serialNumber: 'ARK-30871', model: 'Arken Pro', dateAdded: new Date(now - 7*86400000).toISOString() }
-      ],
-      settings: defaultSettings(),
-      createdAt: new Date(now - 7*86400000).toISOString()
-    },
-    {
-      id: 'bt_test1', name: 'Test User One',
-      email: 'testbt1@example.com',
-      passwordHash: null, role: 'bt',
-      otp: '482751', otpUsed: false, avatarDataUrl: null,
-      devices: [
-        { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST01', model: 'Arken One', dateAdded: new Date(now - 1*86400000).toISOString() }
-      ],
-      settings: defaultSettings(),
-      createdAt: new Date(now - 1*86400000).toISOString()
-    },
-    {
-      id: 'bt_test2', name: 'Test User Two',
-      email: 'testbt2@example.com',
-      passwordHash: null, role: 'bt',
-      otp: '639204', otpUsed: false, avatarDataUrl: null,
-      devices: [
-        { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST02', model: 'Arken One', dateAdded: new Date(now - 1*86400000).toISOString() }
-      ],
-      settings: defaultSettings(),
-      createdAt: new Date(now - 1*86400000).toISOString()
-    },
-    {
-      // Pre-activated on purpose (unlike bt_test1/bt_test2) so it logs in
-      // identically on any device without an OTP first-login step — useful
-      // for cross-device testing.
-      id: 'bt_test3', name: 'Test User Three',
-      email: 'testbt3@example.com',
-      passwordHash: hashPassword('testbt3pass'), role: 'bt',
-      otp: null, otpUsed: true, avatarDataUrl: null,
-      devices: [
-        { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST03', model: 'Arken One', dateAdded: new Date(now - 1*86400000).toISOString() }
-      ],
-      settings: defaultSettings(),
-      createdAt: new Date(now - 1*86400000).toISOString()
-    }
-  ];
-
-  save(KEY_USERS,       users);
-  save(KEY_SUBMISSIONS, []);
-  save(KEY_DRAFTS,      []);
-  save(KEY_EVENTS,      []);
-  localStorage.setItem(KEY_INIT, '1');
+  migrateLocalDataIfPresent();
 }
 
-// Adds new fixed-credential seed accounts to already-initialized browsers
-// without touching real submissions/drafts/events already stored there.
-function patchSeed() {
-  const users = load(KEY_USERS);
-  if (users.some(u => u.id === 'bt_test3')) return;
+// One-time safety net: if this browser has real submissions/drafts left over
+// from the old localStorage-only version of Squawk, push them to the new
+// backend once (as the currently logged-in user), then clear them so they
+// don't get re-offered. No-ops if there's nothing to migrate or no one is
+// logged in yet — retried on next boot until it succeeds.
+async function migrateLocalDataIfPresent() {
+  if (localStorage.getItem(KEY_LOCAL_MIGRATION_DONE)) return;
 
-  users.push({
-    id: 'bt_test3', name: 'Test User Three',
-    email: 'testbt3@example.com',
-    passwordHash: hashPassword('testbt3pass'), role: 'bt',
-    otp: null, otpUsed: true, avatarDataUrl: null,
-    devices: [
-      { id: 'dev_' + genId(), name: 'Test Unit', serialNumber: 'ARK-TEST03', model: 'Arken One', dateAdded: new Date().toISOString() }
-    ],
-    settings: defaultSettings(),
-    createdAt: new Date().toISOString()
-  });
-  save(KEY_USERS, users);
+  const oldSubs   = safeParse(localStorage.getItem('squawk_submissions'));
+  const oldDrafts = safeParse(localStorage.getItem('squawk_drafts'));
+  if ((!oldSubs || oldSubs.length === 0) && (!oldDrafts || oldDrafts.length === 0)) {
+    localStorage.setItem(KEY_LOCAL_MIGRATION_DONE, '1');
+    return;
+  }
+
+  const token = getToken();
+  if (!token) return; // retry once someone is logged in
+
+  try {
+    for (const s of (oldSubs || [])) {
+      await api('/submissions', { method: 'POST', body: {
+        btId: s.btId, title: s.title, category: s.category, subcategory: s.subcategory,
+        description: s.description, deviceId: s.deviceId, model: s.model,
+        eventTimestamp: s.eventTimestamp, timestampPrecision: s.timestampPrecision,
+        attachmentData: s.attachmentData
+      }});
+    }
+    for (const d of (oldDrafts || [])) {
+      await api('/drafts', { method: 'POST', body: {
+        btId: d.btId, title: d.title, category: d.category, subcategory: d.subcategory,
+        description: d.description, deviceId: d.deviceId, model: d.model,
+        eventTimestamp: d.eventTimestamp, timestampPrecision: d.timestampPrecision,
+        attachmentData: d.attachmentData
+      }});
+    }
+    localStorage.removeItem('squawk_submissions');
+    localStorage.removeItem('squawk_drafts');
+    localStorage.setItem(KEY_LOCAL_MIGRATION_DONE, '1');
+  } catch {
+    // Leave the flag unset so this retries on next login.
+  }
+}
+
+function safeParse(str) {
+  try { return JSON.parse(str); } catch { return null; }
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 const Auth = {
-  login(email, password) {
-    const hash  = hashPassword(password);
-    const users = load(KEY_USERS);
-    const user  = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash && u.otpUsed);
-    if (!user) return null;
-    const session = { userId: user.id, role: user.role, expiresAt: Date.now() + 86400000 };
-    sessionSave(KEY_SESSION, session);
-    return user;
+  async login(email, password) {
+    try {
+      const { token, user } = await api('/auth/login', { method: 'POST', auth: false, body: { email, password } });
+      setToken(token);
+      await migrateLocalDataIfPresent();
+      return user;
+    } catch {
+      return null;
+    }
   },
 
-  firstLogin(email, otp, newPassword) {
-    const users = load(KEY_USERS);
-    const idx   = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase() && u.otp === otp && !u.otpUsed);
-    if (idx === -1) return null;
-    users[idx].passwordHash = hashPassword(newPassword);
-    users[idx].otp          = null;
-    users[idx].otpUsed      = true;
-    save(KEY_USERS, users);
-    const session = { userId: users[idx].id, role: users[idx].role, expiresAt: Date.now() + 86400000 };
-    sessionSave(KEY_SESSION, session);
-    return users[idx];
+  async firstLogin(email, otp, newPassword) {
+    try {
+      const { token, user } = await api('/auth/first-login', { method: 'POST', auth: false, body: { email, otp, newPassword } });
+      setToken(token);
+      await migrateLocalDataIfPresent();
+      return user;
+    } catch {
+      return null;
+    }
   },
 
-  checkFirstLogin(email) {
-    const users = load(KEY_USERS);
-    return users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.otp && !u.otpUsed) || null;
+  async checkFirstLogin(email) {
+    try {
+      const { pending } = await api('/auth/check-first-login', { method: 'POST', auth: false, body: { email } });
+      return pending ? { pending: true } : null;
+    } catch {
+      return null;
+    }
   },
 
-  logout() {
-    sessionStorage.removeItem(KEY_SESSION);
+  async logout() {
+    try { await api('/auth/logout', { method: 'POST' }); } catch { /* best effort */ }
+    setToken(null);
   },
 
-  currentUser() {
-    const session = sessionLoad(KEY_SESSION, null);
-    if (!session || Date.now() > session.expiresAt) return null;
-    const users = load(KEY_USERS);
-    return users.find(u => u.id === session.userId) || null;
+  async currentUser() {
+    if (!getToken()) return null;
+    try {
+      const { user } = await api('/auth/me');
+      return user;
+    } catch {
+      setToken(null);
+      return null;
+    }
   },
 
   currentSession() {
-    return sessionLoad(KEY_SESSION, null);
+    const token = getToken();
+    return token ? { token } : null;
   }
 };
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
 
 const Users = {
-  getAll()       { return load(KEY_USERS); },
-  getBTs()       { return load(KEY_USERS).filter(u => u.role === 'bt'); },
-  getAdmins()    { return load(KEY_USERS).filter(u => u.role === 'admin'); },
-  getById(id)    { return load(KEY_USERS).find(u => u.id === id) || null; },
+  getAll()    { return api('/users'); },
+  getBTs()    { return api('/users/bts'); },
+  getAdmins() { return api('/users/admins'); },
+  getById(id) { return api(`/users/${id}`); },
 
   update(id, patch) {
-    const users = load(KEY_USERS);
-    const idx   = users.findIndex(u => u.id === id);
-    if (idx === -1) return null;
-    users[idx] = { ...users[idx], ...patch };
-    save(KEY_USERS, users);
-    return users[idx];
+    // Server hashes passwords itself — translate the old passwordHash-style
+    // patch used by callers into a plaintext newPassword field.
+    const body = { ...patch };
+    if ('passwordHash' in body) delete body.passwordHash;
+    return api(`/users/${id}`, { method: 'PATCH', body });
+  },
+
+  updatePassword(id, newPassword) {
+    return api(`/users/${id}`, { method: 'PATCH', body: { newPassword } });
   },
 
   updateSettings(id, patch) {
-    const users = load(KEY_USERS);
-    const idx   = users.findIndex(u => u.id === id);
-    if (idx === -1) return null;
-    users[idx].settings = { ...defaultSettings(), ...users[idx].settings, ...patch };
-    save(KEY_USERS, users);
-    return users[idx];
+    return api(`/users/${id}/settings`, { method: 'PATCH', body: patch });
   },
 
   addDevice(userId, device) {
-    const users = load(KEY_USERS);
-    const idx   = users.findIndex(u => u.id === userId);
-    if (idx === -1) return null;
-    const dev = { id: 'dev_' + genId(), ...device };
-    users[idx].devices = users[idx].devices || [];
-    users[idx].devices.push(dev);
-    save(KEY_USERS, users);
-    return dev;
+    return api(`/users/${userId}/devices`, { method: 'POST', body: device });
   },
 
   removeDevice(userId, deviceId) {
-    const users = load(KEY_USERS);
-    const idx   = users.findIndex(u => u.id === userId);
-    if (idx === -1) return null;
-    users[idx].devices = (users[idx].devices || []).filter(d => d.id !== deviceId);
-    save(KEY_USERS, users);
-    return users[idx];
+    return api(`/users/${userId}/devices/${deviceId}`, { method: 'DELETE' });
   },
 
   deleteAccount(id) {
-    const users = load(KEY_USERS).filter(u => u.id !== id);
-    save(KEY_USERS, users);
+    return api(`/users/${id}`, { method: 'DELETE' });
   },
 
   create({ name, email }) {
-    const users = load(KEY_USERS);
-    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
-      return { error: 'An account with that email already exists.' };
-    }
-    const otp  = genOTP();
-    const user = {
-      id: 'bt_' + genId(),
-      name, email,
-      passwordHash: null,
-      role: 'bt',
-      otp,
-      otpUsed: false,
-      devices: [],
-      avatarDataUrl: null,
-      settings: defaultSettings(),
-      createdAt: new Date().toISOString(),
-      createdBy: Auth.currentSession()?.userId || null
-    };
-    users.push(user);
-    save(KEY_USERS, users);
-    return { user, otp };
+    return api('/users', { method: 'POST', body: { name, email } });
   }
 };
 
 // ─── DRAFTS ───────────────────────────────────────────────────────────────────
 
 const Drafts = {
-  getByBT(id) {
-    return load(KEY_DRAFTS).filter(d => d.btId === id)
-      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  },
-
-  getById(id) { return load(KEY_DRAFTS).find(d => d.id === id) || null; },
-
-  save(draft) {
-    const drafts = load(KEY_DRAFTS);
-    const now    = new Date().toISOString();
-    if (draft.id) {
-      const idx = drafts.findIndex(d => d.id === draft.id);
-      if (idx !== -1) {
-        drafts[idx] = { ...drafts[idx], ...draft, updatedAt: now };
-        save(KEY_DRAFTS, drafts);
-        return drafts[idx];
-      }
-    }
-    const newDraft = { ...draft, id: 'draft_' + genId(), updatedAt: now, createdAt: now };
-    drafts.push(newDraft);
-    save(KEY_DRAFTS, drafts);
-    return newDraft;
-  },
-
-  delete(id) {
-    save(KEY_DRAFTS, load(KEY_DRAFTS).filter(d => d.id !== id));
-  }
+  getByBT(btId) { return api(`/drafts?btId=${encodeURIComponent(btId)}`); },
+  getById(id)   { return api(`/drafts/${id}`); },
+  save(draft)   { return api('/drafts', { method: 'POST', body: draft }); },
+  delete(id)    { return api(`/drafts/${id}`, { method: 'DELETE' }); }
 };
 
 // ─── SUBMISSIONS ──────────────────────────────────────────────────────────────
 
 const Submissions = {
-  getAll()     { return load(KEY_SUBMISSIONS); },
-  getByBT(id)  { return load(KEY_SUBMISSIONS).filter(s => s.btId === id); },
-  getById(id)  { return load(KEY_SUBMISSIONS).find(s => s.id === id) || null; },
+  getAll()             { return api('/submissions'); },
+  getByBT(btId)        { return api(`/submissions?btId=${encodeURIComponent(btId)}`); },
+  getById(id)          { return api(`/submissions/${id}`); },
+  create(fields)       { return api('/submissions', { method: 'POST', body: fields }); },
+  getAllWithMeta()     { return api('/submissions/with-meta'); },
 
-  create({ btId, title, category, subcategory, description, deviceId, model, eventTimestamp, timestampPrecision, attachmentData }) {
-    const sub = {
-      id:             'sub_' + genId(),
-      btId,
-      submittedAt:    new Date().toISOString(),
-      title, category, subcategory, description,
-      deviceId: deviceId || null,
-      model:    model || null,
-      eventTimestamp:     eventTimestamp || null,
-      timestampPrecision: timestampPrecision || null,
-      attachmentData: attachmentData || null
-    };
-    const subs = load(KEY_SUBMISSIONS);
-    subs.push(sub);
-    save(KEY_SUBMISSIONS, subs);
-
-    const routedTo = getRoutedRep(category);
-    const events   = load(KEY_EVENTS);
-    events.push({ id: genId(), submissionId: sub.id, type: 'submission',  timestamp: sub.submittedAt, repId: null, data: {} });
-    events.push({ id: genId(), submissionId: sub.id, type: 'auto_triage', timestamp: sub.submittedAt, repId: null,
-      data: { routedTo, reason: routedTo ? `${CATEGORIES[category]?.label} — routed to ${REPS[routedTo]?.name}` : `${CATEGORIES[category]?.label} — review for routing` }
-    });
-    save(KEY_EVENTS, events);
-
-    return sub;
-  },
-
-  // Derived status from events
-  getStatus(submissionId) {
-    const evts = load(KEY_EVENTS).filter(e => e.submissionId === submissionId);
-    if (evts.some(e => e.type === 'close'))  return 'closed';
-    if (evts.some(e => e.type === 'claim'))  return 'in-review';
-    return 'new';
-  },
-
-  // Derived current owner (null if unclaimed or just reassigned)
-  getOwner(submissionId) {
-    const evts = load(KEY_EVENTS)
-      .filter(e => e.submissionId === submissionId)
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    let owner = null;
-    for (const e of evts) {
-      if (e.type === 'claim')    owner = e.repId;
-      if (e.type === 'reassign') owner = null;
-    }
-    return owner ? Users.getById(owner) : null;
-  },
-
-  withMeta(sub) {
-    const bt     = Users.getById(sub.btId);
-    const status = Submissions.getStatus(sub.id);
-    const owner  = Submissions.getOwner(sub.id);
-    return { ...sub, bt, status, owner };
-  },
-
-  getAllWithMeta() {
-    return Submissions.getAll().map(Submissions.withMeta)
-      .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-  }
+  // The server already returns bt/status/owner hydrated on getById() and
+  // getAllWithMeta() — this is kept only so existing call sites that pass an
+  // already-fetched submission through withMeta() keep working unchanged.
+  withMeta(sub) { return sub; }
 };
 
 // ─── EVENTS ──────────────────────────────────────────────────────────────────
 
 const Events = {
-  getBySubmission(submissionId) {
-    return load(KEY_EVENTS)
-      .filter(e => e.submissionId === submissionId)
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  getBySubmission(submissionId) { return api(`/events?submissionId=${encodeURIComponent(submissionId)}`); },
+  claim(submissionId)                          { return api('/events/claim',    { method: 'POST', body: { submissionId } }); },
+  reassign(submissionId, _fromRepId, toRepId, reason = '') {
+    return api('/events/reassign', { method: 'POST', body: { submissionId, toRepId, reason } });
   },
-
-  claim(submissionId, repId) {
-    const evts = load(KEY_EVENTS);
-    evts.push({ id: genId(), submissionId, type: 'claim', timestamp: new Date().toISOString(), repId, data: {} });
-    save(KEY_EVENTS, evts);
-  },
-
-  reassign(submissionId, fromRepId, toRepId, reason = '') {
-    const evts = load(KEY_EVENTS);
-    evts.push({ id: genId(), submissionId, type: 'reassign', timestamp: new Date().toISOString(), repId: fromRepId,
-      data: { fromRepId, toRepId, reason }
-    });
-    save(KEY_EVENTS, evts);
-  },
-
-  addNote(submissionId, repId, content) {
-    const evts = load(KEY_EVENTS);
-    evts.push({ id: genId(), submissionId, type: 'note', timestamp: new Date().toISOString(), repId, data: { content } });
-    save(KEY_EVENTS, evts);
-  },
-
-  close(submissionId, repId, note = '') {
-    const evts = load(KEY_EVENTS);
-    evts.push({ id: genId(), submissionId, type: 'close', timestamp: new Date().toISOString(), repId, data: { note } });
-    save(KEY_EVENTS, evts);
-  }
+  addNote(submissionId, _repId, content)       { return api('/events/note',     { method: 'POST', body: { submissionId, content } }); },
+  close(submissionId, _repId, note = '')       { return api('/events/close',    { method: 'POST', body: { submissionId, note } }); }
 };
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 const Dashboard = {
-  stats() {
-    const all    = Submissions.getAll();
-    const open   = all.filter(s => Submissions.getStatus(s.id) !== 'closed');
-    const week   = new Date(Date.now() - 7*86400000);
-    const recent = all.filter(s => new Date(s.submittedAt) > week);
-    const closedWeek = recent.filter(s => Submissions.getStatus(s.id) === 'closed');
+  stats() { return api('/dashboard/stats'); },
 
-    return {
-      total:       all.length,
-      open:        open.length,
-      thisWeek:    recent.length,
-      closedWeek:  closedWeek.length
-    };
+  async categoryBreakdown() {
+    const rows = await api('/dashboard/category-breakdown');
+    return rows.map(r => ({
+      ...r,
+      catLabel: CATEGORIES[r.category]?.label || r.category,
+      subLabel: CATEGORIES[r.category]?.subcategories?.[r.subcategory] || r.subcategory
+    }));
   },
 
-  categoryBreakdown() {
-    const subs = Submissions.getAll();
-    const map  = {};
-    for (const s of subs) {
-      const key = `${s.category}|${s.subcategory}`;
-      map[key]  = (map[key] || 0) + 1;
-    }
-    return Object.entries(map)
-      .map(([key, count]) => {
-        const [cat, sub] = key.split('|');
-        return {
-          category:    cat,
-          subcategory: sub,
-          catLabel:    CATEGORIES[cat]?.label || cat,
-          subLabel:    CATEGORIES[cat]?.subcategories[sub] || sub,
-          count
-        };
-      })
-      .sort((a, b) => b.count - a.count);
-  },
-
-  // Subcategories with 3+ submissions in last 7 days
-  trendAlerts() {
-    const since = new Date(Date.now() - 7*86400000);
-    const subs  = Submissions.getAll().filter(s => new Date(s.submittedAt) > since);
-    const map   = {};
-    for (const s of subs) {
-      const key = `${s.category}|${s.subcategory}`;
-      map[key]  = (map[key] || 0) + 1;
-    }
-    return Object.entries(map)
-      .filter(([, count]) => count >= 3)
-      .map(([key, count]) => {
-        const [cat, sub] = key.split('|');
-        return { category: cat, subcategory: sub, count,
-          catLabel: CATEGORIES[cat]?.label || cat,
-          subLabel: CATEGORIES[cat]?.subcategories[sub] || sub,
-          routedTo: getRoutedRep(cat) };
-      });
+  async trendAlerts() {
+    const rows = await api('/dashboard/trend-alerts');
+    return rows.map(r => ({
+      ...r,
+      catLabel: CATEGORIES[r.category]?.label || r.category,
+      subLabel: CATEGORIES[r.category]?.subcategories?.[r.subcategory] || r.subcategory,
+      routedTo: getRoutedRep(r.category)
+    }));
   }
 };
 

@@ -91,12 +91,12 @@ function closeModal() {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-function init() {
+async function init() {
   DB.seed();
-  currentUser = DB.Auth.currentUser();
+  currentUser = await DB.Auth.currentUser();
 
   if (currentUser && currentUser.role !== 'admin') {
-    DB.Auth.logout();
+    await DB.Auth.logout();
     currentUser = null;
   }
 
@@ -147,7 +147,7 @@ function renderLoginView() {
 
     const email    = document.getElementById('a-email').value.trim();
     const password = document.getElementById('a-password').value;
-    const user     = DB.Auth.login(email, password);
+    const user     = await DB.Auth.login(email, password);
 
     if (!user || user.role !== 'admin') {
       document.getElementById('a-login-error-text').textContent = 'Email or password is incorrect.';
@@ -166,8 +166,10 @@ function renderLoginView() {
 
 let recordFilters = { search: '', category: '', status: '', owner: '' };
 
-function renderRecords() {
+async function renderRecords() {
   const view = document.querySelector('[data-view="records"]');
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const admins = await DB.Users.getAdmins();
   view.innerHTML = `
     <div class="admin-page-header">
       <div>
@@ -200,7 +202,7 @@ function renderRecords() {
       <div class="select-wrapper">
         <select class="input" id="rec-owner">
           <option value="">All owners</option>
-          ${DB.Users.getAdmins().map(u => `<option value="${u.id}" ${recordFilters.owner===u.id?'selected':''}>${u.name}</option>`).join('')}
+          ${admins.map(u => `<option value="${u.id}" ${recordFilters.owner===u.id?'selected':''}>${u.name}</option>`).join('')}
           <option value="unassigned" ${recordFilters.owner==='unassigned'?'selected':''}>Unassigned</option>
         </select>
         <span class="select-chevron"><i class="ti ti-chevron-down" style="font-size:20px"></i></span>
@@ -226,8 +228,10 @@ function renderRecords() {
   renderRecordsTable();
 }
 
-function renderRecordsTable() {
-  let subs = DB.Submissions.getAllWithMeta();
+async function renderRecordsTable() {
+  const wrapLoading = document.getElementById('records-table-wrap');
+  wrapLoading.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  let subs = await DB.Submissions.getAllWithMeta();
 
   if (recordFilters.search) {
     const q = recordFilters.search;
@@ -292,9 +296,12 @@ function renderRecordsTable() {
 
 // ─── TICKET DETAIL ────────────────────────────────────────────────────────────
 
-function renderTicket(id) {
+async function renderTicket(id) {
   const view = document.querySelector('[data-view="ticket"]');
-  const sub  = DB.Submissions.getById(id);
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+
+  let sub = null;
+  try { sub = await DB.Submissions.getById(id); } catch { /* not found */ }
   if (!sub) { view.innerHTML = `<div class="empty-state"><p class="empty-state-title">Ticket not found.</p></div>`; return; }
 
   const meta   = DB.Submissions.withMeta(sub);
@@ -303,7 +310,8 @@ function renderTicket(id) {
   const owner  = meta.owner;
   const catLabel = DB.CATEGORIES[sub.category]?.label || sub.category;
   const subLabel = DB.CATEGORIES[sub.category]?.subcategories[sub.subcategory] || sub.subcategory;
-  const events   = DB.Events.getBySubmission(id);
+  const [events, admins] = await Promise.all([DB.Events.getBySubmission(id), DB.Users.getAdmins()]);
+  const adminsById = Object.fromEntries(admins.map(a => [a.id, a]));
 
   const canClaim    = status !== 'closed' && !owner;
   const canReassign = status === 'in-review' && owner?.id === currentUser.id;
@@ -350,7 +358,7 @@ function renderTicket(id) {
       <div>
         <h3 class="h3 mb-6">Event Log</h3>
         <div class="event-log" id="event-log">
-          ${events.map(ev => renderEventItem(ev, sub)).join('')}
+          ${events.map(ev => renderEventItem(ev, sub, adminsById)).join('')}
         </div>
       </div>
       <div>
@@ -383,14 +391,14 @@ function renderTicket(id) {
     actionsEl.insertAdjacentHTML('beforeend', `<span class="caption text-placeholder">Claimed by ${escHtml(owner.name)}.</span>`);
   }
 
-  document.getElementById('btn-claim')?.addEventListener('click', () => {
-    DB.Events.claim(id, currentUser.id);
+  document.getElementById('btn-claim')?.addEventListener('click', async () => {
+    await DB.Events.claim(id, currentUser.id);
     toast('Ticket claimed.');
     renderTicket(id);
   });
 
   document.getElementById('btn-reassign')?.addEventListener('click', () => {
-    const other = DB.Users.getAdmins().find(u => u.id !== currentUser.id);
+    const other = admins.find(u => u.id !== currentUser.id);
     if (!other) { toast('No other rep to reassign to.', 'error'); return; }
     openModal({
       title: 'Reassign ticket',
@@ -408,9 +416,9 @@ function renderTicket(id) {
                <button class="btn btn-primary" id="confirm-reassign">Reassign</button>`,
       onClose: () => {}
     });
-    document.getElementById('confirm-reassign').addEventListener('click', () => {
+    document.getElementById('confirm-reassign').addEventListener('click', async () => {
       const reason = document.getElementById('reassign-reason').value.trim();
-      DB.Events.reassign(id, currentUser.id, other.id, reason);
+      await DB.Events.reassign(id, currentUser.id, other.id, reason);
       closeModal();
       toast(`Ticket reassigned to ${other.name}.`);
       renderTicket(id);
@@ -430,10 +438,10 @@ function renderTicket(id) {
                <button class="btn btn-primary" id="confirm-note">Add Note</button>`,
       onClose: () => {}
     });
-    document.getElementById('confirm-note').addEventListener('click', () => {
+    document.getElementById('confirm-note').addEventListener('click', async () => {
       const content = document.getElementById('note-content').value.trim();
       if (!content) { toast('Note cannot be empty.', 'error'); return; }
-      DB.Events.addNote(id, currentUser.id, content);
+      await DB.Events.addNote(id, currentUser.id, content);
       closeModal();
       toast('Note added.');
       renderTicket(id);
@@ -453,9 +461,9 @@ function renderTicket(id) {
       disableOverlay: true,
       onClose: () => {}
     });
-    document.getElementById('confirm-close').addEventListener('click', () => {
+    document.getElementById('confirm-close').addEventListener('click', async () => {
       const note = document.getElementById('close-note')?.value.trim() || '';
-      DB.Events.close(id, currentUser.id, note);
+      await DB.Events.close(id, currentUser.id, note);
       closeModal();
       toast('Ticket closed.');
       renderTicket(id);
@@ -463,8 +471,8 @@ function renderTicket(id) {
   });
 }
 
-function renderEventItem(ev, sub) {
-  const rep     = ev.repId ? DB.Users.getById(ev.repId) : null;
+function renderEventItem(ev, sub, adminsById) {
+  const rep     = ev.repId ? adminsById[ev.repId] : null;
   const repName = rep?.name || 'System';
   const time    = formatDateTime(ev.timestamp);
 
@@ -494,7 +502,7 @@ function renderEventItem(ev, sub) {
       bodyHtml = `<strong>${escHtml(repName)}</strong> claimed this ticket.`;
       break;
     case 'reassign': {
-      const toRep = ev.data.toRepId ? DB.Users.getById(ev.data.toRepId) : null;
+      const toRep = ev.data.toRepId ? adminsById[ev.data.toRepId] : null;
       bodyHtml = `<strong>${escHtml(repName)}</strong> reassigned to <strong>${escHtml(toRep?.name || 'Unknown')}</strong>.`;
       if (ev.data.reason) bodyHtml += ` Reason: ${escHtml(ev.data.reason)}`;
       break;
@@ -528,12 +536,14 @@ function renderEventItem(ev, sub) {
 
 let lastCreatedOTP = null;
 
-function renderBetaTesters() {
+async function renderBetaTesters() {
   const view = document.querySelector('[data-view="beta-testers"]');
-  const bts  = DB.Users.getBTs().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const [btsRaw, allSubs] = await Promise.all([DB.Users.getBTs(), DB.Submissions.getAll()]);
+  const bts = btsRaw.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const rows = bts.map(u => {
-    const subCount = DB.Submissions.getByBT(u.id).length;
+    const subCount = allSubs.filter(s => s.btId === u.id).length;
     return `
       <tr>
         <td class="font-bold">${escHtml(u.name)}</td>
@@ -625,7 +635,7 @@ function showAddBTModal() {
     onClose: () => {}
   });
 
-  document.getElementById('confirm-add-bt').addEventListener('click', () => {
+  document.getElementById('confirm-add-bt').addEventListener('click', async () => {
     const name  = document.getElementById('bt-name').value.trim();
     const email = document.getElementById('bt-email').value.trim();
     const errEl = document.getElementById('add-bt-error');
@@ -637,7 +647,7 @@ function showAddBTModal() {
       return;
     }
 
-    const result = DB.Users.create({ name, email });
+    const result = await DB.Users.create({ name, email });
     if (result.error) {
       document.getElementById('add-bt-error-text').textContent = result.error;
       errEl.classList.remove('hidden');
@@ -659,11 +669,12 @@ function copyOTP() {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
-function renderDashboard() {
+async function renderDashboard() {
   const view     = document.querySelector('[data-view="dashboard"]');
-  const stats    = DB.Dashboard.stats();
-  const breakdown = DB.Dashboard.categoryBreakdown();
-  const alerts   = DB.Dashboard.trendAlerts();
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const [stats, breakdown, alerts, recentAll] = await Promise.all([
+    DB.Dashboard.stats(), DB.Dashboard.categoryBreakdown(), DB.Dashboard.trendAlerts(), DB.Submissions.getAllWithMeta()
+  ]);
   const maxCount = breakdown[0]?.count || 1;
 
   const alertsHtml = alerts.length > 0 ? `
@@ -693,7 +704,7 @@ function renderDashboard() {
     `;
   }).join('');
 
-  const recentSubs = DB.Submissions.getAllWithMeta().slice(0, 8);
+  const recentSubs = recentAll.slice(0, 8);
   const recentHtml = recentSubs.map(s => {
     const catLabel = DB.CATEGORIES[s.category]?.label || s.category;
     const subLabel = DB.CATEGORIES[s.category]?.subcategories[s.subcategory] || s.subcategory;
@@ -786,8 +797,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => showView(btn.dataset.target));
   });
 
-  document.getElementById('btn-admin-signout')?.addEventListener('click', () => {
-    DB.Auth.logout();
+  document.getElementById('btn-admin-signout')?.addEventListener('click', async () => {
+    await DB.Auth.logout();
     currentUser = null;
     renderLoginView();
     showView('login');

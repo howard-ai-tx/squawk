@@ -1,0 +1,8 @@
+name = "squawk-api"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "squawk_db"
+database_name = "squawk-db"
+database_id = "d2216ce2-999e-4569-b733-b9b7a9d77c56"

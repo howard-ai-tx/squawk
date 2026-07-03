@@ -182,12 +182,12 @@ function applyAppearance(user) {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-function init() {
+async function init() {
   DB.seed();
-  currentUser = DB.Auth.currentUser();
+  currentUser = await DB.Auth.currentUser();
 
   if (currentUser && currentUser.role !== 'bt') {
-    DB.Auth.logout();
+    await DB.Auth.logout();
     currentUser = null;
   }
 
@@ -255,10 +255,10 @@ function renderLoginView() {
   const form = document.getElementById('login-form');
   let isFirstLogin = false;
 
-  emailInput.addEventListener('blur', () => {
+  emailInput.addEventListener('blur', async () => {
     const email = emailInput.value.trim();
     if (!email) return;
-    const pending = DB.Auth.checkFirstLogin(email);
+    const pending = await DB.Auth.checkFirstLogin(email);
     isFirstLogin  = !!pending;
 
     document.getElementById('password-field').classList.toggle('hidden', isFirstLogin);
@@ -267,7 +267,7 @@ function renderLoginView() {
     document.getElementById('login-btn').textContent = isFirstLogin ? 'Set Password & Sign In' : 'Sign In';
   });
 
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     clearLoginError();
     const btn = document.getElementById('login-btn');
@@ -280,12 +280,12 @@ function renderLoginView() {
         const pass = document.getElementById('login-new-password').value;
         if (!otp || !pass) { showLoginError('Please enter your code and set a password.'); return; }
         if (pass.length < 8) { showLoginError('Password must be at least 8 characters.'); return; }
-        const user = DB.Auth.firstLogin(emailInput.value.trim(), otp, pass);
+        const user = await DB.Auth.firstLogin(emailInput.value.trim(), otp, pass);
         if (!user) { showLoginError('That code is incorrect. Check with your Howard AI contact.'); return; }
         currentUser = user;
       } else {
         const pass = document.getElementById('login-password').value;
-        const user = DB.Auth.login(emailInput.value.trim(), pass);
+        const user = await DB.Auth.login(emailInput.value.trim(), pass);
         if (!user) { showLoginError('Email or password is incorrect.'); return; }
         if (user.role === 'admin') { window.location.href = 'admin.html'; return; }
         if (user.role !== 'bt') { showLoginError('Email or password is incorrect.'); return; }
@@ -324,11 +324,13 @@ function greeting() {
   return 'Good evening';
 }
 
-function renderDashboard() {
+async function renderDashboard() {
   const view = document.querySelector('[data-view="dashboard"]');
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
   const firstName = (currentUser.name || '').split(' ')[0] || '';
   const since = Date.now() - 86400000;
-  const recent = DB.Submissions.getByBT(currentUser.id)
+  const allSubs = await DB.Submissions.getByBT(currentUser.id);
+  const recent = allSubs
     .filter(s => new Date(s.submittedAt).getTime() > since)
     .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
 
@@ -440,13 +442,13 @@ function wireTopicPicker() {
 
 // ─── NEW SUBMISSION ──────────────────────────────────────────────────────────
 
-function renderNewSubmission(draftId) {
+async function renderNewSubmission(draftId) {
   attachmentData = null;
   editingDraftId = draftId || null;
-  const draft = draftId ? DB.Drafts.getById(draftId) : null;
-  const initialTopic = draft ? { category: draft.category, subcategory: draft.subcategory } : null;
-
   const view = document.querySelector('[data-view="new"]');
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const draft = draftId ? await DB.Drafts.getById(draftId) : null;
+  const initialTopic = draft ? { category: draft.category, subcategory: draft.subcategory } : null;
   const devices = currentUser.devices || [];
 
   let modelFieldHtml = '';
@@ -595,7 +597,7 @@ function collectNewFormFields() {
   };
 }
 
-function handleNewSubmit(e) {
+async function handleNewSubmit(e) {
   e.preventDefault();
   const errEl   = document.getElementById('new-error');
   const errText = document.getElementById('new-error-text');
@@ -610,22 +612,39 @@ function handleNewSubmit(e) {
     return;
   }
 
-  DB.Submissions.create({ btId: currentUser.id, ...fields });
-  if (editingDraftId) DB.Drafts.delete(editingDraftId);
-  toast('Submission received.');
-  showView('submitted');
+  const btn = document.getElementById('new-submit-btn');
+  btn.disabled = true;
+  try {
+    await DB.Submissions.create({ btId: currentUser.id, ...fields });
+    if (editingDraftId) await DB.Drafts.delete(editingDraftId);
+    toast('Submission received.');
+    showView('submitted');
+  } catch {
+    errText.textContent = 'Something went wrong submitting this. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
-function handleSaveDraft() {
+async function handleSaveDraft() {
   const fields = collectNewFormFields();
-  const draft = DB.Drafts.save({
-    id: editingDraftId || undefined,
-    btId: currentUser.id,
-    ...fields
-  });
-  editingDraftId = draft.id;
-  toast('Saved. You can view and edit this in Drafts.');
-  showView('drafts');
+  const btn = document.getElementById('new-save-btn');
+  btn.disabled = true;
+  try {
+    const draft = await DB.Drafts.save({
+      id: editingDraftId || undefined,
+      btId: currentUser.id,
+      ...fields
+    });
+    editingDraftId = draft.id;
+    toast('Saved. You can view and edit this in Drafts.');
+    showView('drafts');
+  } catch {
+    toast('Could not save this draft. Please try again.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function handleCancelNew() {
@@ -635,9 +654,10 @@ async function handleCancelNew() {
 
 // ─── DRAFTS ───────────────────────────────────────────────────────────────────
 
-function renderDrafts() {
+async function renderDrafts() {
   const view = document.querySelector('[data-view="drafts"]');
-  const drafts = DB.Drafts.getByBT(currentUser.id);
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const drafts = await DB.Drafts.getByBT(currentUser.id);
 
   if (drafts.length === 0) {
     view.innerHTML = `
@@ -679,17 +699,18 @@ async function handleDeleteDraft(id, title) {
     'Delete Draft'
   );
   if (!ok) return;
-  DB.Drafts.delete(id);
+  await DB.Drafts.delete(id);
   toast('Draft deleted.');
   renderDrafts();
 }
 
 // ─── SUBMITTED ────────────────────────────────────────────────────────────────
 
-function renderSubmitted() {
+async function renderSubmitted() {
   const view = document.querySelector('[data-view="submitted"]');
-  const subs = DB.Submissions.getByBT(currentUser.id)
-    .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const allSubs = await DB.Submissions.getByBT(currentUser.id);
+  const subs = allSubs.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
 
   if (subs.length === 0) {
     view.innerHTML = `
@@ -727,9 +748,11 @@ function renderSubmitted() {
   `;
 }
 
-function renderSubmissionDetail(id) {
+async function renderSubmissionDetail(id) {
   const view = document.querySelector('[data-view="submission-detail"]');
-  const sub  = DB.Submissions.getById(id);
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  let sub = null;
+  try { sub = await DB.Submissions.getById(id); } catch { /* not found */ }
 
   if (!sub || sub.btId !== currentUser.id) {
     view.innerHTML = `<div class="empty-state"><p class="empty-state-title">Submission not found.</p></div>`;
@@ -922,25 +945,25 @@ function renderSettings() {
     </div>
   `;
 
-  document.getElementById('save-name-btn').addEventListener('click', () => {
+  document.getElementById('save-name-btn').addEventListener('click', async () => {
     const name = document.getElementById('set-name').value.trim();
     if (!name) { toast('Username cannot be empty.', 'error'); return; }
-    currentUser = DB.Users.update(currentUser.id, { name });
+    currentUser = await DB.Users.update(currentUser.id, { name });
     renderSidebarUser();
     toast('Username updated.');
   });
 
-  document.getElementById('save-email-btn').addEventListener('click', () => {
+  document.getElementById('save-email-btn').addEventListener('click', async () => {
     const email = document.getElementById('set-email').value.trim();
     if (!email) { toast('Email cannot be empty.', 'error'); return; }
-    currentUser = DB.Users.update(currentUser.id, { email });
+    currentUser = await DB.Users.update(currentUser.id, { email });
     toast('Email updated.');
   });
 
-  document.getElementById('save-password-btn').addEventListener('click', () => {
+  document.getElementById('save-password-btn').addEventListener('click', async () => {
     const pass = document.getElementById('set-password').value;
     if (!pass || pass.length < 8) { toast('Password must be at least 8 characters.', 'error'); return; }
-    currentUser = DB.Users.update(currentUser.id, { passwordHash: hashPassword(pass) });
+    currentUser = await DB.Users.updatePassword(currentUser.id, pass);
     document.getElementById('set-password').value = '';
     toast('Password updated.');
   });
@@ -950,8 +973,8 @@ function renderSettings() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
-      currentUser = DB.Users.update(currentUser.id, { avatarDataUrl: ev.target.result });
+    reader.onload = async ev => {
+      currentUser = await DB.Users.update(currentUser.id, { avatarDataUrl: ev.target.result });
       renderSidebarUser();
       renderSettings();
       toast('Profile picture updated.');
@@ -968,50 +991,50 @@ function renderSettings() {
       'Delete Account'
     );
     if (!ok) return;
-    DB.Users.deleteAccount(currentUser.id);
-    DB.Auth.logout();
+    await DB.Users.deleteAccount(currentUser.id);
+    await DB.Auth.logout();
     currentUser = null;
     renderLoginView();
     showView('login');
     toast('Account deleted.');
   });
 
-  document.getElementById('set-email-notif').addEventListener('change', e => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { emailNotifications: e.target.checked });
+  document.getElementById('set-email-notif').addEventListener('change', async e => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { emailNotifications: e.target.checked });
     toast('Notification preferences saved.');
   });
 
   document.querySelectorAll('.color-swatch').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentUser = DB.Users.updateSettings(currentUser.id, { primaryColor: btn.dataset.hex });
+    btn.addEventListener('click', async () => {
+      currentUser = await DB.Users.updateSettings(currentUser.id, { primaryColor: btn.dataset.hex });
       applyAppearance(currentUser);
       renderSettings();
     });
   });
 
-  document.getElementById('theme-light-btn').addEventListener('click', () => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { theme: 'light' });
+  document.getElementById('theme-light-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { theme: 'light' });
     applyAppearance(currentUser);
     renderSettings();
   });
-  document.getElementById('theme-dark-btn').addEventListener('click', () => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { theme: 'dark' });
+  document.getElementById('theme-dark-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { theme: 'dark' });
     applyAppearance(currentUser);
     renderSettings();
   });
 
-  document.getElementById('text-small-btn').addEventListener('click', () => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { textSize: 'small' });
+  document.getElementById('text-small-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'small' });
     applyAppearance(currentUser);
     renderSettings();
   });
-  document.getElementById('text-regular-btn').addEventListener('click', () => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { textSize: 'regular' });
+  document.getElementById('text-regular-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'regular' });
     applyAppearance(currentUser);
     renderSettings();
   });
-  document.getElementById('text-large-btn').addEventListener('click', () => {
-    currentUser = DB.Users.updateSettings(currentUser.id, { textSize: 'large' });
+  document.getElementById('text-large-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'large' });
     applyAppearance(currentUser);
     renderSettings();
   });
@@ -1052,7 +1075,7 @@ function showAddDeviceModal() {
     onClose: () => {}
   });
 
-  document.getElementById('confirm-add-device').addEventListener('click', () => {
+  document.getElementById('confirm-add-device').addEventListener('click', async () => {
     const name   = document.getElementById('dev-name').value.trim();
     const serial = document.getElementById('dev-serial').value.trim();
     const date   = document.getElementById('dev-date').value;
@@ -1065,8 +1088,8 @@ function showAddDeviceModal() {
       return;
     }
 
-    DB.Users.addDevice(currentUser.id, { name, serialNumber: serial, dateAdded: new Date(date).toISOString(), model });
-    currentUser = DB.Users.getById(currentUser.id);
+    await DB.Users.addDevice(currentUser.id, { name, serialNumber: serial, dateAdded: new Date(date).toISOString(), model });
+    currentUser = await DB.Users.getById(currentUser.id);
     closeModal();
     toast('Howard unit added.');
     renderSettings();
@@ -1080,8 +1103,8 @@ async function handleRemoveDevice(deviceId, deviceName) {
     'Remove Howard Unit'
   );
   if (!ok) return;
-  DB.Users.removeDevice(currentUser.id, deviceId);
-  currentUser = DB.Users.getById(currentUser.id);
+  await DB.Users.removeDevice(currentUser.id, deviceId);
+  currentUser = await DB.Users.getById(currentUser.id);
   toast('Howard unit removed.');
   renderSettings();
 }
@@ -1115,8 +1138,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('bt-sidebar-toggle')?.addEventListener('click', openSidebar);
   document.getElementById('bt-sidebar-overlay')?.addEventListener('click', closeSidebar);
 
-  document.getElementById('btn-signout')?.addEventListener('click', () => {
-    DB.Auth.logout();
+  document.getElementById('btn-signout')?.addEventListener('click', async () => {
+    await DB.Auth.logout();
     currentUser = null;
     applyAppearance(null);
     renderLoginView();
