@@ -66,6 +66,11 @@
 
 html { font-size: 16px; }
 
+html, body {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 body {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-size: 16px;
@@ -638,6 +643,7 @@ tbody td {
 
 .bt-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
 }
 
@@ -648,10 +654,12 @@ tbody td {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: var(--space-6) 0;
+  padding: calc(var(--space-6) + env(safe-area-inset-top)) 0 calc(var(--space-6) + env(safe-area-inset-bottom));
+  padding-left: env(safe-area-inset-left);
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   z-index: 200;
 }
@@ -785,8 +793,8 @@ tbody td {
 .bt-sidebar-toggle {
   display: none;
   position: fixed;
-  top: var(--space-4);
-  left: var(--space-4);
+  top: calc(var(--space-4) + env(safe-area-inset-top));
+  left: calc(var(--space-4) + env(safe-area-inset-left));
   z-index: 250;
   width: 40px;
   height: 40px;
@@ -831,7 +839,7 @@ tbody td {
   }
   .bt-shell.sidebar-open .bt-sidebar { transform: translateX(0); }
   .bt-shell.sidebar-open .bt-sidebar-overlay { display: block; }
-  .bt-main { padding-top: 72px; }
+  .bt-main { padding-top: calc(72px + env(safe-area-inset-top)); }
 }
 
 /* ─── TOPIC PICKER ────────────────────────────────────────────── */
@@ -1000,6 +1008,7 @@ body.dark-mode {
 
 .admin-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
 }
 
@@ -1009,10 +1018,12 @@ body.dark-mode {
   background: var(--dark-bg);
   display: flex;
   flex-direction: column;
-  padding: var(--space-6) 0;
+  padding: calc(var(--space-6) + env(safe-area-inset-top)) 0 calc(var(--space-6) + env(safe-area-inset-bottom));
+  padding-left: env(safe-area-inset-left);
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
 }
 
@@ -1159,6 +1170,9 @@ body.dark-mode {
 
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   align-items: center;
   justify-content: center;
