@@ -110,3 +110,14 @@ export function submissionToJson(row) {
 export function eventToJson(row) {
   return { id: row.id, submissionId: row.submission_id, type: row.type, timestamp: row.timestamp, repId: row.rep_id, data: JSON.parse(row.data_json || '{}') };
 }
+
+export function newsToJson(row) {
+  return {
+    id: row.id, title: row.title, subtitle: row.subtitle,
+    tags: JSON.parse(row.tags_json || '[]'),
+    image: row.image_json ? JSON.parse(row.image_json) : null,
+    bodyHtml: row.body_html,
+    authorId: row.author_id, authorName: row.author_name,
+    publishedAt: row.published_at
+  };
+}

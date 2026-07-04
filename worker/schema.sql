@@ -71,8 +71,21 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at  INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS news (
+  id            TEXT PRIMARY KEY,
+  title         TEXT NOT NULL,
+  subtitle      TEXT,
+  tags_json     TEXT NOT NULL DEFAULT '[]',
+  image_json    TEXT,
+  body_html     TEXT NOT NULL,
+  author_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  author_name   TEXT NOT NULL,
+  published_at  TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id);
 CREATE INDEX IF NOT EXISTS idx_drafts_bt ON drafts(bt_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_bt ON submissions(bt_id);
 CREATE INDEX IF NOT EXISTS idx_events_submission ON events(submission_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_news_published ON news(published_at);

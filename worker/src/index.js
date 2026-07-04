@@ -1,4 +1,4 @@
-import { json, error, genId, genOTP, hashPassword, verifyPassword, userToJson, deviceToJson, draftToJson, submissionToJson, eventToJson, corsHeaders } from './util.js';
+import { json, error, genId, genOTP, hashPassword, verifyPassword, userToJson, deviceToJson, draftToJson, submissionToJson, eventToJson, newsToJson, corsHeaders } from './util.js';
 
 const SESSION_TTL_MS = 86400000; // 24h, matches previous client-side session TTL
 const CATEGORY_ROUTING = {
@@ -368,6 +368,30 @@ export default {
           catLabel: CATEGORY_LABELS[r.category] || r.category, subLabel: r.subcategory,
           count: r.count, routedTo: CATEGORY_ROUTING[r.category] || null
         })), 200, origin);
+      }
+
+      // ── NEWS ──────────────────────────────────────────────────────────────
+      if (path === '/news' && request.method === 'GET') {
+        const rows = (await db.prepare('SELECT * FROM news ORDER BY published_at DESC').all()).results;
+        return json(rows.map(newsToJson), 200, origin);
+      }
+
+      if (path === '/news' && request.method === 'POST') {
+        if (me.role !== 'admin') return error('Forbidden.', 403, origin);
+        const n = await request.json();
+        if (!n.title || !n.bodyHtml) return error('Title and body are required.', 400, origin);
+        const id = genId('news');
+        const publishedAt = new Date().toISOString();
+        await db.prepare(`INSERT INTO news (id, title, subtitle, tags_json, image_json, body_html, author_id, author_name, published_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+          .bind(id, n.title, n.subtitle || null, JSON.stringify(n.tags || []), n.image ? JSON.stringify(n.image) : null, n.bodyHtml, me.id, me.name, publishedAt).run();
+        const row = await db.prepare('SELECT * FROM news WHERE id = ?').bind(id).first();
+        return json(newsToJson(row), 200, origin);
+      }
+
+      if (parts[0] === 'news' && parts.length === 2 && request.method === 'DELETE') {
+        if (me.role !== 'admin') return error('Forbidden.', 403, origin);
+        await db.prepare('DELETE FROM news WHERE id = ?').bind(parts[1]).run();
+        return json({ ok: true }, 200, origin);
       }
 
       return error('Not found.', 404, origin);

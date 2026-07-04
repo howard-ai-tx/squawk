@@ -22,10 +22,13 @@ function showView(name, params = {}) {
     a.classList.toggle('active', a.dataset.target === name);
   });
 
-  if (name === 'records')    renderRecords();
-  if (name === 'dashboard')  renderDashboard();
-  if (name === 'beta-testers') renderBetaTesters();
-  if (name === 'ticket')     renderTicket(params.id);
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'records')   renderRecords();
+  if (name === 'users')     renderUsers();
+  if (name === 'messages')  renderMessages();
+  if (name === 'news')      renderNews();
+  if (name === 'settings')  renderSettings();
+  if (name === 'ticket')    renderTicket(params.id);
 }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
@@ -89,6 +92,62 @@ function closeModal() {
   }, { once: true });
 }
 
+function confirmDestructive(title, message, destructiveLabel) {
+  return new Promise(resolve => {
+    openModal({
+      title,
+      body: `<p class="body">${message}</p>`,
+      footer: `<button class="btn btn-secondary" id="cd-cancel">Cancel</button>
+               <button class="btn btn-destructive" id="cd-confirm">${destructiveLabel}</button>`,
+      onClose: () => resolve(false),
+      disableOverlay: true
+    });
+    document.getElementById('cd-confirm').addEventListener('click', () => { modalCloseCallback = () => resolve(true); closeModal(); });
+    document.getElementById('cd-cancel').addEventListener('click', () => closeModal());
+  });
+}
+
+// ─── APPEARANCE ──────────────────────────────────────────────────────────────
+
+function shade(hex, percent) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  let r = (n >> 16) + amt, g = (n >> 8 & 0x00FF) + amt, b = (n & 0x0000FF) + amt;
+  r = Math.max(Math.min(255, r), 0); g = Math.max(Math.min(255, g), 0); b = Math.max(Math.min(255, b), 0);
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+}
+
+const COLOR_PALETTE = [
+  { name: 'Teal',    hex: '#0F7A6C' },
+  { name: 'Blue',    hex: '#2563EB' },
+  { name: 'Indigo',  hex: '#4F46E5' },
+  { name: 'Purple',  hex: '#9333EA' },
+  { name: 'Pink',    hex: '#DB2777' },
+  { name: 'Orange',  hex: '#EA580C' },
+  { name: 'Amber',   hex: '#B45309' },
+  { name: 'Emerald', hex: '#059669' }
+];
+
+function colorName(hex) {
+  const match = COLOR_PALETTE.find(c => c.hex.toLowerCase() === (hex || '').toLowerCase());
+  return match ? match.name : 'Custom';
+}
+
+const TEXT_SIZES = { small: 0.9, regular: 1, large: 1.15 };
+
+function applyAppearance(user) {
+  const settings = user?.settings || { primaryColor: '#0F7A6C', theme: 'light', textSize: 'regular' };
+  const root = document.documentElement;
+  root.style.setProperty('--brand', settings.primaryColor);
+  root.style.setProperty('--brand-hover', shade(settings.primaryColor, -10));
+  root.style.setProperty('--brand-active', shade(settings.primaryColor, -20));
+  document.body.classList.toggle('dark-mode', settings.theme === 'dark');
+  document.querySelectorAll('.login-logo img').forEach(img => {
+    img.src = settings.theme === 'dark' ? 'Squawk-logo-white-text.png' : 'Squawk-logo.png';
+  });
+  document.documentElement.style.zoom = TEXT_SIZES[settings.textSize] || 1;
+}
+
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -101,10 +160,23 @@ async function init() {
   }
 
   if (!currentUser) {
+    applyAppearance(null);
     renderLoginView();
     showView('login');
   } else {
-    showView('records');
+    applyAppearance(currentUser);
+    renderSidebarUser();
+    showView('dashboard');
+  }
+}
+
+function renderSidebarUser() {
+  document.getElementById('admin-sidebar-username').textContent = currentUser.name;
+  const avatar = document.getElementById('admin-sidebar-avatar');
+  if (currentUser.avatarDataUrl) {
+    avatar.innerHTML = `<img src="${currentUser.avatarDataUrl}" alt="">`;
+  } else {
+    avatar.textContent = (currentUser.name || '?').trim().charAt(0).toUpperCase();
   }
 }
 
@@ -158,7 +230,9 @@ function renderLoginView() {
     }
 
     currentUser = user;
-    showView('records');
+    applyAppearance(currentUser);
+    renderSidebarUser();
+    showView('dashboard');
   });
 }
 
@@ -174,14 +248,14 @@ async function renderRecords() {
     <div class="admin-page-header">
       <div>
         <h1 class="admin-page-title">Records</h1>
-        <p class="admin-page-subtitle">All beta tester submissions, open and closed.</p>
+        <p class="admin-page-subtitle">All user submissions, open and closed.</p>
       </div>
     </div>
 
     <div class="filter-bar">
       <div class="input-wrapper" style="flex:1;min-width:200px">
         <span class="input-icon"><i class="ti ti-search" style="font-size:20px"></i></span>
-        <input class="input" type="search" id="rec-search" placeholder="Search BT name, message, subcategory..." value="${escHtml(recordFilters.search)}">
+        <input class="input" type="search" id="rec-search" placeholder="Search user name, message, subcategory..." value="${escHtml(recordFilters.search)}">
       </div>
       <div class="select-wrapper">
         <select class="input" id="rec-cat" style="min-width:150px">
@@ -255,7 +329,7 @@ async function renderRecordsTable() {
       <div class="empty-state">
         <div class="empty-state-icon"><i class="ti ti-files" style="font-size:48px"></i></div>
         <p class="empty-state-title">${recordFilters.search || recordFilters.category || recordFilters.status || recordFilters.owner ? 'No results for those filters.' : 'No submissions yet.'}</p>
-        <p class="empty-state-body">${recordFilters.search || recordFilters.category || recordFilters.status || recordFilters.owner ? 'Try adjusting your filters.' : 'Submissions from beta testers will appear here.'}</p>
+        <p class="empty-state-body">${recordFilters.search || recordFilters.category || recordFilters.status || recordFilters.owner ? 'Try adjusting your filters.' : 'Submissions from users will appear here.'}</p>
       </div>
     `;
     return;
@@ -284,7 +358,7 @@ async function renderRecordsTable() {
       <table>
         <thead>
           <tr>
-            <th>Date</th><th>Title</th><th>Beta Tester</th><th>Category</th><th>Subcategory</th>
+            <th>Date</th><th>Title</th><th>User</th><th>Category</th><th>Subcategory</th>
             <th>Status</th><th>Assigned To</th>
           </tr>
         </thead>
@@ -349,7 +423,7 @@ async function renderTicket(id) {
         <p class="ticket-meta-value">${owner ? escHtml(owner.name) : '<span style="color:var(--text-placeholder)">Unassigned</span>'}</p>
       </div>
       <div class="ticket-meta-item">
-        <p class="ticket-meta-label">Beta Tester</p>
+        <p class="ticket-meta-label">User</p>
         <p class="ticket-meta-value">${escHtml(bt?.name || 'Unknown')} <span class="caption text-placeholder">${escHtml(bt?.email || '')}</span></p>
       </div>
     </div>
@@ -532,17 +606,17 @@ function renderEventItem(ev, sub, adminsById) {
   `;
 }
 
-// ─── BETA TESTERS ─────────────────────────────────────────────────────────────
+// ─── USERS ────────────────────────────────────────────────────────────────────
 
 let lastCreatedOTP = null;
 
-async function renderBetaTesters() {
-  const view = document.querySelector('[data-view="beta-testers"]');
+async function renderUsers() {
+  const view = document.querySelector('[data-view="users"]');
   view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
-  const [btsRaw, allSubs] = await Promise.all([DB.Users.getBTs(), DB.Submissions.getAll()]);
-  const bts = btsRaw.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const [usersRaw, allSubs] = await Promise.all([DB.Users.getBTs(), DB.Submissions.getAll()]);
+  const users = usersRaw.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  const rows = bts.map(u => {
+  const rows = users.map(u => {
     const subCount = allSubs.filter(s => s.btId === u.id).length;
     return `
       <tr>
@@ -562,12 +636,12 @@ async function renderBetaTesters() {
   view.innerHTML = `
     <div class="admin-page-header">
       <div>
-        <h1 class="admin-page-title">Beta Testers</h1>
-        <p class="admin-page-subtitle">All BT accounts. New accounts are created here and activated manually.</p>
+        <h1 class="admin-page-title">Users</h1>
+        <p class="admin-page-subtitle">All user accounts. New accounts are created here and activated manually.</p>
       </div>
-      <button class="btn btn-primary" id="btn-add-bt">
+      <button class="btn btn-primary" id="btn-add-user">
         <i class="ti ti-user-plus" style="font-size:20px" aria-hidden="true"></i>
-        Add Beta Tester
+        Add User
       </button>
     </div>
 
@@ -576,7 +650,7 @@ async function renderBetaTesters() {
         <span class="alert-icon"><i class="ti ti-info-circle" style="color:var(--action);font-size:20px"></i></span>
         <div class="alert-body">
           <p class="alert-title">Account created — share this one-time code</p>
-          <p class="alert-message">The beta tester will use this code on their first sign-in to set their password. Share it directly (text, call, or in person).</p>
+          <p class="alert-message">The user will use this code on their first sign-in to set their password. Share it directly (text, call, or in person).</p>
           <div class="otp-display" style="margin-top:var(--space-4);max-width:280px">
             <p class="caption text-tertiary">One-time code</p>
             <p class="otp-code" id="otp-value">${lastCreatedOTP}</p>
@@ -591,7 +665,7 @@ async function renderBetaTesters() {
       </div>
     ` : ''}
 
-    ${bts.length > 0 ? `
+    ${users.length > 0 ? `
       <div class="table-wrapper">
         <table>
           <thead>
@@ -603,53 +677,53 @@ async function renderBetaTesters() {
     ` : `
       <div class="empty-state">
         <div class="empty-state-icon"><i class="ti ti-users" style="font-size:48px"></i></div>
-        <p class="empty-state-title">No beta testers yet.</p>
-        <p class="empty-state-body">Add your first beta tester to get started.</p>
+        <p class="empty-state-title">No users yet.</p>
+        <p class="empty-state-body">Add your first user to get started.</p>
       </div>
     `}
   `;
 
-  document.getElementById('btn-add-bt').addEventListener('click', showAddBTModal);
+  document.getElementById('btn-add-user').addEventListener('click', showAddUserModal);
 }
 
-function showAddBTModal() {
+function showAddUserModal() {
   openModal({
-    title: 'Add beta tester',
+    title: 'Add user',
     body: `
       <div class="field" style="margin-bottom:var(--space-4)">
-        <label class="field-label" for="bt-name">Full name <span class="field-required">Required</span></label>
-        <input class="input" type="text" id="bt-name" autocomplete="name" placeholder="First Last">
+        <label class="field-label" for="new-user-name">Full name <span class="field-required">Required</span></label>
+        <input class="input" type="text" id="new-user-name" autocomplete="name" placeholder="First Last">
       </div>
       <div class="field">
-        <label class="field-label" for="bt-email">Email address <span class="field-required">Required</span></label>
-        <input class="input" type="email" id="bt-email" autocomplete="email" placeholder="tester@example.com">
+        <label class="field-label" for="new-user-email">Email address <span class="field-required">Required</span></label>
+        <input class="input" type="email" id="new-user-email" autocomplete="email" placeholder="user@example.com">
         <p class="field-helper">They'll use this to sign in.</p>
       </div>
-      <div id="add-bt-error" class="field-error hidden mt-2">
+      <div id="add-user-error" class="field-error hidden mt-2">
         <i class="ti ti-alert-circle" style="font-size:16px"></i>
-        <span id="add-bt-error-text"></span>
+        <span id="add-user-error-text"></span>
       </div>
     `,
     footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-             <button class="btn btn-primary" id="confirm-add-bt">Create Account</button>`,
+             <button class="btn btn-primary" id="confirm-add-user">Create Account</button>`,
     onClose: () => {}
   });
 
-  document.getElementById('confirm-add-bt').addEventListener('click', async () => {
-    const name  = document.getElementById('bt-name').value.trim();
-    const email = document.getElementById('bt-email').value.trim();
-    const errEl = document.getElementById('add-bt-error');
+  document.getElementById('confirm-add-user').addEventListener('click', async () => {
+    const name  = document.getElementById('new-user-name').value.trim();
+    const email = document.getElementById('new-user-email').value.trim();
+    const errEl = document.getElementById('add-user-error');
     errEl.classList.add('hidden');
 
     if (!name || !email) {
-      document.getElementById('add-bt-error-text').textContent = 'Name and email are required.';
+      document.getElementById('add-user-error-text').textContent = 'Name and email are required.';
       errEl.classList.remove('hidden');
       return;
     }
 
     const result = await DB.Users.create({ name, email });
     if (result.error) {
-      document.getElementById('add-bt-error-text').textContent = result.error;
+      document.getElementById('add-user-error-text').textContent = result.error;
       errEl.classList.remove('hidden');
       return;
     }
@@ -657,7 +731,7 @@ function showAddBTModal() {
     lastCreatedOTP = result.otp;
     closeModal();
     toast(`Account created for ${name}.`);
-    renderBetaTesters();
+    renderUsers();
   });
 }
 
@@ -769,6 +843,592 @@ async function renderDashboard() {
   `;
 }
 
+// ─── MESSAGES ─────────────────────────────────────────────────────────────────
+
+function renderMessages() {
+  const view = document.querySelector('[data-view="messages"]');
+  view.innerHTML = `
+    <h2 class="h2 mb-6">Messages</h2>
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="ti ti-message-2" style="font-size:48px"></i></div>
+      <p class="empty-state-title">No messages.</p>
+    </div>
+  `;
+}
+
+// ─── NEWS ─────────────────────────────────────────────────────────────────────
+
+async function renderNews() {
+  const view = document.querySelector('[data-view="news"]');
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const stories = await DB.News.getAll();
+
+  view.innerHTML = `
+    <div class="admin-page-header">
+      <div>
+        <h1 class="admin-page-title">News</h1>
+        <p class="admin-page-subtitle">Publish product releases and feature updates to users.</p>
+      </div>
+      <button class="btn btn-primary" id="btn-new-story">
+        <i class="ti ti-pencil" style="font-size:20px" aria-hidden="true"></i>
+        New
+      </button>
+    </div>
+
+    ${stories.length === 0 ? `
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="ti ti-news" style="font-size:48px"></i></div>
+        <p class="empty-state-title">No News</p>
+      </div>
+    ` : stories.map(s => renderNewsCard(s, { deletable: true })).join('')}
+  `;
+
+  document.getElementById('btn-new-story').addEventListener('click', showComposeNewsModal);
+}
+
+function renderNewsCard(n, { deletable = false } = {}) {
+  const tags = n.tags || [];
+  return `
+    <div class="news-card">
+      ${n.image ? `<img class="news-card-image" src="${n.image.dataUrl}" alt="">` : ''}
+      <div class="news-card-body">
+        ${tags.length ? `<div class="news-card-tags">${tags.map(t => `<span class="badge badge-cat">${escHtml(t)}</span>`).join('')}</div>` : ''}
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="h3">${escHtml(n.title)}</h3>
+          ${deletable ? `<button class="btn-icon" aria-label="Delete story" onclick="handleDeleteNews('${n.id}', '${escJs(n.title)}')"><i class="ti ti-trash" style="font-size:18px"></i></button>` : ''}
+        </div>
+        ${n.subtitle ? `<p class="body text-secondary mt-2">${escHtml(n.subtitle)}</p>` : ''}
+        <div class="news-card-content mt-4">${n.bodyHtml}</div>
+        <p class="caption text-tertiary mt-4">${formatDate(n.publishedAt)} · ${escHtml(n.authorName)}</p>
+      </div>
+    </div>
+  `;
+}
+
+async function handleDeleteNews(id, title) {
+  const ok = await confirmDestructive(
+    `Delete "${escHtml(title)}"?`,
+    'This action cannot be undone. This story will be permanently removed from News for everyone.',
+    'Delete Story'
+  );
+  if (!ok) return;
+  await DB.News.delete(id);
+  toast('Story deleted.');
+  renderNews();
+}
+
+let composeImage = null;
+let composeTags = [];
+
+function showComposeNewsModal(prefill = null) {
+  if (!prefill) { composeImage = null; composeTags = []; }
+
+  openModal({
+    title: 'New story',
+    body: `
+      <div class="field mb-4">
+        <label class="field-label" for="news-title">Title <span class="field-required">Required</span></label>
+        <input class="input" type="text" id="news-title" placeholder="e.g. Howard Core 2.4 is here" value="${escHtml(prefill?.title || '')}">
+      </div>
+      <div class="field mb-4">
+        <label class="field-label" for="news-subtitle">Subtitle <span style="color:var(--text-placeholder);font-size:13px">Optional</span></label>
+        <input class="input" type="text" id="news-subtitle" placeholder="A one-line summary" value="${escHtml(prefill?.subtitle || '')}">
+      </div>
+      <div class="field mb-4">
+        <label class="field-label" for="news-tag-input">Tags <span style="color:var(--text-placeholder);font-size:13px">Optional</span></label>
+        <input class="input" type="text" id="news-tag-input" placeholder="Type a tag and press Enter">
+        <div class="flex gap-2 mt-2" id="news-tags-list" style="flex-wrap:wrap"></div>
+      </div>
+      <div class="field mb-4">
+        <label class="field-label">Image <span style="color:var(--text-placeholder);font-size:13px">Optional, roughly 12x8</span></label>
+        <div class="file-drop ${composeImage ? 'has-file' : ''}" id="news-image-drop" tabindex="0" role="button" aria-label="Attach an image">
+          <input type="file" id="news-image-input" accept="image/*" style="display:none">
+          <i class="ti ti-photo-up" style="font-size:24px;color:var(--text-placeholder);margin-bottom:8px"></i>
+          <p class="caption text-placeholder" id="news-image-status">${composeImage ? 'Image attached — click to replace' : 'Click to attach an image'}</p>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="news-body">Body <span class="field-required">Required</span></label>
+        <div class="richtext-toolbar" id="news-toolbar">
+          <button type="button" data-cmd="bold" aria-label="Bold"><i class="ti ti-bold" style="font-size:18px"></i></button>
+          <button type="button" data-cmd="italic" aria-label="Italic"><i class="ti ti-italic" style="font-size:18px"></i></button>
+          <button type="button" data-cmd="underline" aria-label="Underline"><i class="ti ti-underline" style="font-size:18px"></i></button>
+          <button type="button" data-cmd="insertUnorderedList" aria-label="Bullet list"><i class="ti ti-list" style="font-size:18px"></i></button>
+          <button type="button" data-cmd="insertOrderedList" aria-label="Numbered list"><i class="ti ti-list-numbers" style="font-size:18px"></i></button>
+          <button type="button" data-cmd="formatBlock" data-value="h3" aria-label="Heading"><i class="ti ti-heading" style="font-size:18px"></i></button>
+          <button type="button" data-cmd="formatBlock" data-value="p" aria-label="Paragraph"><i class="ti ti-letter-p" style="font-size:18px"></i></button>
+        </div>
+        <div class="richtext-editable" id="news-body" contenteditable="true" data-placeholder="Write the story...">${prefill?.bodyHtml || ''}</div>
+      </div>
+      <div id="news-error" class="field-error hidden mt-2">
+        <i class="ti ti-alert-circle" style="font-size:16px"></i>
+        <span id="news-error-text"></span>
+      </div>
+    `,
+    footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+             <button class="btn btn-primary" id="confirm-publish">Publish</button>`,
+    onClose: () => {}
+  });
+
+  wireRichTextToolbar(document.getElementById('news-toolbar'), document.getElementById('news-body'));
+
+  const tagInput = document.getElementById('news-tag-input');
+  tagInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const val = tagInput.value.trim();
+    if (val && !composeTags.includes(val)) {
+      composeTags.push(val);
+      renderComposeTags();
+    }
+    tagInput.value = '';
+  });
+  renderComposeTags();
+
+  const imageDrop  = document.getElementById('news-image-drop');
+  const imageInput = document.getElementById('news-image-input');
+  imageDrop.addEventListener('click', () => imageInput.click());
+  imageInput.addEventListener('change', () => {
+    const file = imageInput.files[0];
+    imageInput.value = '';
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { toast('Image must be under 15MB.', 'error'); return; }
+    // Opening the cropper's own modal would otherwise destroy this compose
+    // modal (only one can be open at a time) — capture the in-progress
+    // fields so the compose modal can be faithfully rebuilt afterward.
+    const draft = {
+      title: document.getElementById('news-title').value,
+      subtitle: document.getElementById('news-subtitle').value,
+      bodyHtml: document.getElementById('news-body').innerHTML
+    };
+    openRectCropper(file, { aspect: 3 / 2, outputW: 1200, outputH: 800 }, dataUrl => {
+      composeImage = { dataUrl };
+      showComposeNewsModal(draft);
+    });
+  });
+
+  document.getElementById('confirm-publish').addEventListener('click', async () => {
+    const title    = document.getElementById('news-title').value.trim();
+    const subtitle = document.getElementById('news-subtitle').value.trim();
+    const bodyHtml = document.getElementById('news-body').innerHTML.trim();
+    const errEl    = document.getElementById('news-error');
+    errEl.classList.add('hidden');
+
+    if (!title || !bodyHtml) {
+      document.getElementById('news-error-text').textContent = 'Title and body are required.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    await DB.News.create({ title, subtitle, tags: composeTags, image: composeImage, bodyHtml });
+    closeModal();
+    toast('Story published.');
+    renderNews();
+  });
+}
+
+function renderComposeTags() {
+  const wrap = document.getElementById('news-tags-list');
+  wrap.innerHTML = composeTags.map((t, i) => `
+    <span class="news-tag-chip">${escHtml(t)}<button type="button" aria-label="Remove tag" data-idx="${i}"><i class="ti ti-x" style="font-size:14px"></i></button></span>
+  `).join('');
+  wrap.querySelectorAll('button[data-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      composeTags.splice(Number(btn.dataset.idx), 1);
+      renderComposeTags();
+    });
+  });
+}
+
+function wireRichTextToolbar(toolbarEl, editableEl) {
+  toolbarEl.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      editableEl.focus();
+      document.execCommand(btn.dataset.cmd, false, btn.dataset.value || undefined);
+    });
+  });
+}
+
+// ─── RECTANGULAR IMAGE CROPPER (used for News images) ───────────────────────
+
+function openRectCropper(file, { aspect, outputW, outputH }, onSave) {
+  const objectUrl = URL.createObjectURL(file);
+  const editorW = 400, editorH = Math.round(400 / aspect);
+  let naturalW = 0, naturalH = 0, baseScale = 1;
+  const state = { zoom: 1, x: 0, y: 0 };
+  let dragging = false, dragStartX = 0, dragStartY = 0, startX = 0, startY = 0;
+
+  openModal({
+    title: 'Adjust image',
+    body: `
+      <div class="avatar-cropper-wrap" id="rect-cropper-wrap" style="width:${editorW}px;height:${editorH}px;border-radius:var(--radius-md)">
+        <img id="rect-cropper-img" src="${objectUrl}" alt="" draggable="false">
+      </div>
+      <div class="field mt-4">
+        <label class="field-label" for="rect-zoom">Zoom</label>
+        <input type="range" id="rect-zoom" min="1" max="3" step="0.01" value="1" style="width:100%">
+      </div>
+    `,
+    footer: `<button class="btn btn-secondary" id="rect-cancel">Cancel</button>
+             <button class="btn btn-primary" id="rect-save">Use Image</button>`,
+    onClose: () => URL.revokeObjectURL(objectUrl)
+  });
+
+  const img  = document.getElementById('rect-cropper-img');
+  const wrap = document.getElementById('rect-cropper-wrap');
+  const zoomSlider = document.getElementById('rect-zoom');
+
+  function clampAndApply() {
+    const scale = baseScale * state.zoom;
+    const w = naturalW * scale, h = naturalH * scale;
+    const maxX = Math.max(0, (w - editorW) / 2);
+    const maxY = Math.max(0, (h - editorH) / 2);
+    state.x = Math.max(-maxX, Math.min(maxX, state.x));
+    state.y = Math.max(-maxY, Math.min(maxY, state.y));
+    img.style.width  = w + 'px';
+    img.style.height = h + 'px';
+    img.style.left = `calc(50% - ${w / 2 - state.x}px)`;
+    img.style.top  = `calc(50% - ${h / 2 - state.y}px)`;
+  }
+
+  img.onload = () => {
+    naturalW = img.naturalWidth;
+    naturalH = img.naturalHeight;
+    baseScale = Math.max(editorW / naturalW, editorH / naturalH);
+    state.zoom = 1; state.x = 0; state.y = 0;
+    clampAndApply();
+  };
+
+  zoomSlider.addEventListener('input', () => {
+    state.zoom = parseFloat(zoomSlider.value);
+    clampAndApply();
+  });
+
+  wrap.addEventListener('pointerdown', e => {
+    dragging = true;
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    startX = state.x; startY = state.y;
+    wrap.setPointerCapture(e.pointerId);
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    state.x = startX + (e.clientX - dragStartX);
+    state.y = startY + (e.clientY - dragStartY);
+    clampAndApply();
+  });
+  wrap.addEventListener('pointerup',     () => { dragging = false; });
+  wrap.addEventListener('pointercancel', () => { dragging = false; });
+
+  document.getElementById('rect-cancel').addEventListener('click', () => closeModal());
+
+  document.getElementById('rect-save').addEventListener('click', () => {
+    const scale = baseScale * state.zoom;
+    const outRatio = outputW / editorW;
+    const w = naturalW * scale * outRatio, h = naturalH * scale * outRatio;
+    const drawX = (outputW - w) / 2 + state.x * outRatio;
+    const drawY = (outputH - h) / 2 + state.y * outRatio;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = outputW;
+    canvas.height = outputH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, drawX, drawY, w, h);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    closeModal();
+    onSave(dataUrl);
+  });
+}
+
+// ─── AVATAR CROPPER (circular, used in Settings) ────────────────────────────
+
+const AVATAR_EDITOR_SIZE = 280;
+const AVATAR_OUTPUT_SIZE = 512;
+
+function openAvatarCropper(file, onSave) {
+  const objectUrl = URL.createObjectURL(file);
+  let naturalW = 0, naturalH = 0, baseScale = 1;
+  const state = { zoom: 1, x: 0, y: 0 };
+  let dragging = false, dragStartX = 0, dragStartY = 0, startX = 0, startY = 0;
+
+  openModal({
+    title: 'Adjust your photo',
+    body: `
+      <div class="avatar-cropper-wrap" id="avatar-cropper-wrap">
+        <img id="avatar-cropper-img" src="${objectUrl}" alt="" draggable="false">
+        <div class="avatar-cropper-mask"></div>
+      </div>
+      <div class="field mt-4">
+        <label class="field-label" for="avatar-zoom">Zoom</label>
+        <input type="range" id="avatar-zoom" min="1" max="3" step="0.01" value="1" style="width:100%">
+      </div>
+    `,
+    footer: `<button class="btn btn-secondary" id="avatar-cancel">Cancel</button>
+             <button class="btn btn-primary" id="avatar-save">Save Photo</button>`,
+    onClose: () => URL.revokeObjectURL(objectUrl)
+  });
+
+  const img  = document.getElementById('avatar-cropper-img');
+  const wrap = document.getElementById('avatar-cropper-wrap');
+  const zoomSlider = document.getElementById('avatar-zoom');
+
+  function clampAndApply() {
+    const scale = baseScale * state.zoom;
+    const w = naturalW * scale, h = naturalH * scale;
+    const maxX = Math.max(0, (w - AVATAR_EDITOR_SIZE) / 2);
+    const maxY = Math.max(0, (h - AVATAR_EDITOR_SIZE) / 2);
+    state.x = Math.max(-maxX, Math.min(maxX, state.x));
+    state.y = Math.max(-maxY, Math.min(maxY, state.y));
+    img.style.width  = w + 'px';
+    img.style.height = h + 'px';
+    img.style.left = `calc(50% - ${w / 2 - state.x}px)`;
+    img.style.top  = `calc(50% - ${h / 2 - state.y}px)`;
+  }
+
+  img.onload = () => {
+    naturalW = img.naturalWidth;
+    naturalH = img.naturalHeight;
+    baseScale = Math.max(AVATAR_EDITOR_SIZE / naturalW, AVATAR_EDITOR_SIZE / naturalH);
+    state.zoom = 1; state.x = 0; state.y = 0;
+    clampAndApply();
+  };
+
+  zoomSlider.addEventListener('input', () => {
+    state.zoom = parseFloat(zoomSlider.value);
+    clampAndApply();
+  });
+
+  wrap.addEventListener('pointerdown', e => {
+    dragging = true;
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    startX = state.x; startY = state.y;
+    wrap.setPointerCapture(e.pointerId);
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    state.x = startX + (e.clientX - dragStartX);
+    state.y = startY + (e.clientY - dragStartY);
+    clampAndApply();
+  });
+  wrap.addEventListener('pointerup',     () => { dragging = false; });
+  wrap.addEventListener('pointercancel', () => { dragging = false; });
+
+  document.getElementById('avatar-cancel').addEventListener('click', () => closeModal());
+
+  document.getElementById('avatar-save').addEventListener('click', () => {
+    const scale = baseScale * state.zoom;
+    const outRatio = AVATAR_OUTPUT_SIZE / AVATAR_EDITOR_SIZE;
+    const w = naturalW * scale * outRatio, h = naturalH * scale * outRatio;
+    const drawX = (AVATAR_OUTPUT_SIZE - w) / 2 + state.x * outRatio;
+    const drawY = (AVATAR_OUTPUT_SIZE - h) / 2 + state.y * outRatio;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = AVATAR_OUTPUT_SIZE;
+    canvas.height = AVATAR_OUTPUT_SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, drawX, drawY, w, h);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    closeModal();
+    onSave(dataUrl);
+  });
+}
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+
+function renderSettings() {
+  const view = document.querySelector('[data-view="settings"]');
+  const s = currentUser.settings || { emailNotifications: true, primaryColor: '#0F7A6C', theme: 'light', textSize: 'regular' };
+
+  view.innerHTML = `
+    <h2 class="h2 mb-6">Settings</h2>
+
+    <div class="card mb-6">
+      <h3 class="h3 mb-6">Account</h3>
+
+      <div class="field mb-4">
+        <label class="field-label" for="set-name">Username</label>
+        <div class="flex gap-2">
+          <input class="input" type="text" id="set-name" value="${escHtml(currentUser.name)}">
+          <button class="btn btn-secondary" id="save-name-btn">Save</button>
+        </div>
+      </div>
+
+      <div class="field mb-4">
+        <label class="field-label" for="set-email">Email</label>
+        <div class="flex gap-2">
+          <input class="input" type="email" id="set-email" value="${escHtml(currentUser.email)}">
+          <button class="btn btn-secondary" id="save-email-btn">Save</button>
+        </div>
+      </div>
+
+      <div class="field mb-4">
+        <label class="field-label" for="set-password">New password</label>
+        <div class="flex gap-2">
+          <input class="input" type="password" id="set-password" placeholder="At least 8 characters">
+          <button class="btn btn-secondary" id="save-password-btn">Save</button>
+        </div>
+      </div>
+
+      <div class="field mb-6">
+        <label class="field-label">Profile picture</label>
+        <div class="flex items-center gap-4">
+          <div class="bt-avatar bt-avatar-lg" id="set-avatar-preview">${currentUser.avatarDataUrl ? `<img src="${currentUser.avatarDataUrl}" alt="">` : escHtml((currentUser.name||'?').charAt(0).toUpperCase())}</div>
+          <input type="file" id="set-avatar-input" accept="image/*" style="display:none">
+          <button class="btn btn-secondary" id="set-avatar-btn">Change Photo</button>
+        </div>
+      </div>
+
+      <hr class="divider mt-6 mb-6">
+
+      <button class="btn btn-destructive" id="delete-account-btn">Delete Account</button>
+    </div>
+
+    <div class="card mb-6">
+      <h3 class="h3 mb-6">Notifications</h3>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="body font-bold">Email notifications</p>
+          <p class="caption text-tertiary">Receive an email when there's activity on submissions.</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="set-email-notif" ${s.emailNotifications ? 'checked' : ''}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card mb-6">
+      <h3 class="h3 mb-6">Appearance</h3>
+
+      <div class="field mb-6">
+        <label class="field-label">Primary color <span class="caption text-tertiary" id="color-name-label">${colorName(s.primaryColor)}</span></label>
+        <div class="color-swatch-grid">
+          ${COLOR_PALETTE.map(c => `
+            <button type="button" class="color-swatch ${s.primaryColor.toLowerCase() === c.hex.toLowerCase() ? 'active' : ''}"
+              style="background:${c.hex}" data-hex="${c.hex}" data-name="${c.name}" aria-label="${c.name}" title="${c.name}">
+              <i class="ti ti-check" style="font-size:16px"></i>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="field mb-6">
+        <label class="field-label">Theme</label>
+        <div class="flex gap-2">
+          <button class="btn ${s.theme === 'light' ? 'btn-brand' : 'btn-secondary'}" id="theme-light-btn">
+            <i class="ti ti-sun" style="font-size:18px"></i> Light
+          </button>
+          <button class="btn ${s.theme === 'dark' ? 'btn-brand' : 'btn-secondary'}" id="theme-dark-btn">
+            <i class="ti ti-moon" style="font-size:18px"></i> Dark
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Text size</label>
+        <div class="flex gap-2">
+          <button class="btn ${s.textSize === 'small' ? 'btn-brand' : 'btn-secondary'}" id="text-small-btn">Small</button>
+          <button class="btn ${s.textSize === 'regular' ? 'btn-brand' : 'btn-secondary'}" id="text-regular-btn">Regular</button>
+          <button class="btn ${s.textSize === 'large' ? 'btn-brand' : 'btn-secondary'}" id="text-large-btn">Large</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('save-name-btn').addEventListener('click', async () => {
+    const name = document.getElementById('set-name').value.trim();
+    if (!name) { toast('Username cannot be empty.', 'error'); return; }
+    currentUser = await DB.Users.update(currentUser.id, { name });
+    renderSidebarUser();
+    toast('Username updated.');
+  });
+
+  document.getElementById('save-email-btn').addEventListener('click', async () => {
+    const email = document.getElementById('set-email').value.trim();
+    if (!email) { toast('Email cannot be empty.', 'error'); return; }
+    currentUser = await DB.Users.update(currentUser.id, { email });
+    toast('Email updated.');
+  });
+
+  document.getElementById('save-password-btn').addEventListener('click', async () => {
+    const pass = document.getElementById('set-password').value;
+    if (!pass || pass.length < 8) { toast('Password must be at least 8 characters.', 'error'); return; }
+    currentUser = await DB.Users.updatePassword(currentUser.id, pass);
+    document.getElementById('set-password').value = '';
+    toast('Password updated.');
+  });
+
+  document.getElementById('set-avatar-btn').addEventListener('click', () => document.getElementById('set-avatar-input').click());
+  document.getElementById('set-avatar-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { toast('Image must be under 15MB.', 'error'); return; }
+    openAvatarCropper(file, async dataUrl => {
+      currentUser = await DB.Users.update(currentUser.id, { avatarDataUrl: dataUrl });
+      renderSidebarUser();
+      renderSettings();
+      toast('Profile picture updated.');
+    });
+  });
+
+  document.getElementById('delete-account-btn').addEventListener('click', async () => {
+    const ok = await confirmDestructive(
+      `Delete your account, ${escHtml(currentUser.name)}?`,
+      'This action cannot be undone. Your account will be permanently removed.',
+      'Delete Account'
+    );
+    if (!ok) return;
+    await DB.Users.deleteAccount(currentUser.id);
+    await DB.Auth.logout();
+    currentUser = null;
+    renderLoginView();
+    showView('login');
+    toast('Account deleted.');
+  });
+
+  document.getElementById('set-email-notif').addEventListener('change', async e => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { emailNotifications: e.target.checked });
+    toast('Notification preferences saved.');
+  });
+
+  document.querySelectorAll('.color-swatch').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      currentUser = await DB.Users.updateSettings(currentUser.id, { primaryColor: btn.dataset.hex });
+      applyAppearance(currentUser);
+      renderSettings();
+    });
+  });
+
+  document.getElementById('theme-light-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { theme: 'light' });
+    applyAppearance(currentUser);
+    renderSettings();
+  });
+  document.getElementById('theme-dark-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { theme: 'dark' });
+    applyAppearance(currentUser);
+    renderSettings();
+  });
+
+  document.getElementById('text-small-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'small' });
+    applyAppearance(currentUser);
+    renderSettings();
+  });
+  document.getElementById('text-regular-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'regular' });
+    applyAppearance(currentUser);
+    renderSettings();
+  });
+  document.getElementById('text-large-btn').addEventListener('click', async () => {
+    currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'large' });
+    applyAppearance(currentUser);
+    renderSettings();
+  });
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function statusBadge(status) {
@@ -790,6 +1450,11 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function escJs(str) {
+  if (!str) return '';
+  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -797,9 +1462,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => showView(btn.dataset.target));
   });
 
+  document.getElementById('admin-sidebar-user-btn')?.addEventListener('click', () => showView('settings'));
+
   document.getElementById('btn-admin-signout')?.addEventListener('click', async () => {
     await DB.Auth.logout();
     currentUser = null;
+    applyAppearance(null);
     renderLoginView();
     showView('login');
   });

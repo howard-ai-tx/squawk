@@ -363,6 +363,14 @@ const Dashboard = {
   }
 };
 
+// ─── NEWS ─────────────────────────────────────────────────────────────────────
+
+const News = {
+  getAll()      { return api('/news'); },
+  create(fields) { return api('/news', { method: 'POST', body: fields }); },
+  delete(id)     { return api(`/news/${id}`, { method: 'DELETE' }); }
+};
+
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, Users, Drafts, Submissions, Events, Dashboard, CATEGORIES, HOWARD_MODELS, SEVERITIES, REPS, seed };
+window.DB = { Auth, Users, Drafts, Submissions, Events, Dashboard, News, CATEGORIES, HOWARD_MODELS, SEVERITIES, REPS, seed };

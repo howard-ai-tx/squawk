@@ -19,40 +19,62 @@
   <div class="admin-shell hidden" id="admin-shell">
     <aside class="admin-sidebar">
       <div class="admin-sidebar-logo">
-        <img src="Squawk-logo.png" alt="Squawk by Howard AI">
+        <img src="Squawk-logo-white-text.png" alt="Squawk by Howard AI">
       </div>
       <nav class="admin-nav" aria-label="Admin navigation">
+        <button class="admin-nav-item" data-target="dashboard">
+          <i class="ti ti-layout-dashboard" style="font-size:20px" aria-hidden="true"></i>
+          Dashboard
+        </button>
+        <div class="admin-nav-divider"></div>
         <button class="admin-nav-item" data-target="records">
           <i class="ti ti-files" style="font-size:20px" aria-hidden="true"></i>
           Records
         </button>
-        <button class="admin-nav-item" data-target="dashboard">
-          <i class="ti ti-chart-bar" style="font-size:20px" aria-hidden="true"></i>
-          Dashboard
-        </button>
-        <button class="admin-nav-item" data-target="beta-testers">
+        <button class="admin-nav-item" data-target="users">
           <i class="ti ti-users" style="font-size:20px" aria-hidden="true"></i>
-          Beta Testers
+          Users
         </button>
         <div class="admin-nav-divider"></div>
-        <button class="admin-nav-item admin-nav-signout" id="btn-admin-signout">
-          <i class="ti ti-logout" style="font-size:20px" aria-hidden="true"></i>
-          Sign Out
+        <button class="admin-nav-item" data-target="messages">
+          <i class="ti ti-message-2" style="font-size:20px" aria-hidden="true"></i>
+          Messages
+        </button>
+        <button class="admin-nav-item" data-target="news">
+          <i class="ti ti-news" style="font-size:20px" aria-hidden="true"></i>
+          News
+        </button>
+        <button class="admin-nav-item" data-target="settings">
+          <i class="ti ti-settings" style="font-size:20px" aria-hidden="true"></i>
+          Settings
         </button>
       </nav>
+
+      <div class="bt-sidebar-footer admin-sidebar-footer" id="admin-sidebar-footer">
+        <div class="bt-sidebar-user" id="admin-sidebar-user-btn" data-target="settings">
+          <div class="bt-avatar" id="admin-sidebar-avatar"></div>
+          <span class="bt-sidebar-username" id="admin-sidebar-username"></span>
+        </div>
+        <button class="btn-icon" id="btn-admin-signout" aria-label="Sign out">
+          <i class="ti ti-logout" style="font-size:20px" aria-hidden="true"></i>
+        </button>
+      </div>
     </aside>
 
     <main class="admin-main">
-      <div data-view="records"></div>
       <div data-view="dashboard"></div>
-      <div data-view="beta-testers"></div>
+      <div data-view="records"></div>
+      <div data-view="users"></div>
+      <div data-view="messages"></div>
+      <div data-view="news"></div>
+      <div data-view="settings"></div>
       <div data-view="ticket"></div>
     </main>
   </div>
 
   <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="assets/js/data.js"></script>
-  <script src="assets/js/admin.js"></script>
+  <script src="assets/js/data.js?v=2"></script>
+  <script src="assets/js/admin.js?v=3"></script>
 </body>
 </html>

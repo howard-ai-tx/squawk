@@ -810,13 +810,40 @@ function renderMessages() {
   `;
 }
 
-function renderNews() {
+async function renderNews() {
   const view = document.querySelector('[data-view="news"]');
-  view.innerHTML = `
-    <h2 class="h2 mb-6">News</h2>
-    <div class="empty-state">
-      <div class="empty-state-icon"><i class="ti ti-news" style="font-size:48px"></i></div>
-      <p class="empty-state-title">No news.</p>
+  view.innerHTML = `<p class="body text-tertiary">Loading…</p>`;
+  const stories = await DB.News.getAll();
+
+  if (stories.length === 0) {
+    view.innerHTML = `
+      <h2 class="h2 mb-6">News</h2>
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="ti ti-news" style="font-size:48px"></i></div>
+        <p class="empty-state-title">No News</p>
+      </div>
+    `;
+    return;
+  }
+
+  view.innerHTML = `<h2 class="h2 mb-6">News</h2>${stories.map(s => renderNewsCard(s)).join('')}`;
+}
+
+function renderNewsCard(n, { deletable = false } = {}) {
+  const tags = n.tags || [];
+  return `
+    <div class="news-card">
+      ${n.image ? `<img class="news-card-image" src="${n.image.dataUrl}" alt="">` : ''}
+      <div class="news-card-body">
+        ${tags.length ? `<div class="news-card-tags">${tags.map(t => `<span class="badge badge-cat">${escHtml(t)}</span>`).join('')}</div>` : ''}
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="h3">${escHtml(n.title)}</h3>
+          ${deletable ? `<button class="btn-icon" aria-label="Delete story" onclick="handleDeleteNews('${n.id}', '${escJs(n.title)}')"><i class="ti ti-trash" style="font-size:18px"></i></button>` : ''}
+        </div>
+        ${n.subtitle ? `<p class="body text-secondary mt-2">${escHtml(n.subtitle)}</p>` : ''}
+        <div class="news-card-content mt-4">${n.bodyHtml}</div>
+        <p class="caption text-tertiary mt-4">${formatDate(n.publishedAt)} · ${escHtml(n.authorName)}</p>
+      </div>
     </div>
   `;
 }

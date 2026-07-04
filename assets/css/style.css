@@ -666,7 +666,7 @@ tbody td {
 
 .bt-sidebar-logo {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0 var(--space-6) var(--space-6);
   border-bottom: 1px solid var(--divider);
   margin-bottom: var(--space-4);
@@ -1035,6 +1035,17 @@ body.dark-mode {
 
 .admin-sidebar-logo img { height: 28px; width: auto; }
 
+.admin-sidebar-footer {
+  border-top-color: rgba(255,255,255,0.08);
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+.admin-sidebar-footer .bt-sidebar-user:hover { background: rgba(255,255,255,0.06); }
+.admin-sidebar-footer .bt-sidebar-username { color: #fff; }
+.admin-sidebar-footer .btn-icon { color: rgba(255,255,255,0.65); }
+.admin-sidebar-footer .btn-icon:hover { color: #fff; background: rgba(255,255,255,0.06); }
+
 .admin-nav {
   flex: 1;
   display: flex;
@@ -1251,6 +1262,91 @@ body.dark-mode {
   margin: var(--space-3) 0;
   font-family: 'Courier New', monospace;
 }
+
+/* ─── NEWS ────────────────────────────────────────────────────── */
+
+.news-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--space-6);
+  background: var(--surface);
+}
+
+.news-card-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+
+.news-card-body { padding: var(--space-6); }
+
+.news-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.news-card-content { color: var(--text-secondary); line-height: 1.6; }
+.news-card-content p { margin-bottom: var(--space-3); }
+.news-card-content ul, .news-card-content ol { margin: 0 0 var(--space-3) var(--space-6); }
+.news-card-content h1, .news-card-content h2, .news-card-content h3 { margin-bottom: var(--space-2); color: var(--text-primary); }
+
+/* ─── RICH TEXT EDITOR ────────────────────────────────────────── */
+
+.richtext-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--light-bg);
+}
+
+.richtext-toolbar button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.richtext-toolbar button:hover { background: var(--surface); color: var(--text-primary); }
+
+.richtext-editable {
+  min-height: 160px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.richtext-editable:focus { outline: none; border-color: var(--brand); }
+.richtext-editable ul, .richtext-editable ol { margin-left: var(--space-6); }
+
+.news-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--light-bg);
+  font-size: 13px;
+}
+
+.news-tag-chip button { background: none; border: none; cursor: pointer; color: var(--text-tertiary); display: flex; }
 
 /* ─── SUBMISSION HISTORY ITEM ─────────────────────────────────── */
 
