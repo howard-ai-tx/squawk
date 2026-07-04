@@ -97,7 +97,7 @@ const CATEGORIES = {
   }
 };
 
-const HOWARD_MODELS = ['Arken One', 'Arken Mini', 'Arken Pro', 'Other'];
+const HOWARD_MODELS = ['Howard Core', 'Other'];
 
 const SEVERITIES = {
   low:    'Low',

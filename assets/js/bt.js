@@ -1050,7 +1050,7 @@ function showAddDeviceModal() {
       </div>
       <div class="field mb-4">
         <label class="field-label" for="dev-serial">Serial number <span class="field-required">Required</span></label>
-        <input class="input" type="text" id="dev-serial" placeholder="ARK-XXXXX">
+        <input class="input" type="text" id="dev-serial" placeholder="HW-XXXX">
       </div>
       <div class="field mb-4">
         <label class="field-label" for="dev-date">Date added <span class="field-required">Required</span></label>
