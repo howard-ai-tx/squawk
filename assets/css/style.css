@@ -742,6 +742,37 @@ tbody td {
 .bt-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .bt-avatar-lg { width: 56px; height: 56px; font-size: 22px; }
 
+/* ─── AVATAR CROPPER ──────────────────────────────────────────── */
+
+.avatar-cropper-wrap {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--dark-bg);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.avatar-cropper-wrap:active { cursor: grabbing; }
+
+.avatar-cropper-wrap img {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+}
+
+.avatar-cropper-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2000px rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+
 .bt-sidebar-username {
   font-size: 14px;
   font-weight: 700;

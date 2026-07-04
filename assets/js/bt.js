@@ -971,15 +971,15 @@ function renderSettings() {
   document.getElementById('set-avatar-btn').addEventListener('click', () => document.getElementById('set-avatar-input').click());
   document.getElementById('set-avatar-input').addEventListener('change', e => {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      currentUser = await DB.Users.update(currentUser.id, { avatarDataUrl: ev.target.result });
+    if (file.size > 15 * 1024 * 1024) { toast('Image must be under 15MB.', 'error'); return; }
+    openAvatarCropper(file, async dataUrl => {
+      currentUser = await DB.Users.update(currentUser.id, { avatarDataUrl: dataUrl });
       renderSidebarUser();
       renderSettings();
       toast('Profile picture updated.');
-    };
-    reader.readAsDataURL(file);
+    });
   });
 
   document.getElementById('add-device-btn').addEventListener('click', showAddDeviceModal);
@@ -1037,6 +1037,100 @@ function renderSettings() {
     currentUser = await DB.Users.updateSettings(currentUser.id, { textSize: 'large' });
     applyAppearance(currentUser);
     renderSettings();
+  });
+}
+
+// ─── AVATAR CROPPER ──────────────────────────────────────────────────────────
+
+const AVATAR_EDITOR_SIZE = 280; // on-screen crop circle, px
+const AVATAR_OUTPUT_SIZE = 512; // saved resolution, px — supports high-res source photos
+
+function openAvatarCropper(file, onSave) {
+  const objectUrl = URL.createObjectURL(file);
+  let naturalW = 0, naturalH = 0, baseScale = 1;
+  const state = { zoom: 1, x: 0, y: 0 };
+  let dragging = false, dragStartX = 0, dragStartY = 0, startX = 0, startY = 0;
+
+  openModal({
+    title: 'Adjust your photo',
+    body: `
+      <div class="avatar-cropper-wrap" id="avatar-cropper-wrap">
+        <img id="avatar-cropper-img" src="${objectUrl}" alt="" draggable="false">
+        <div class="avatar-cropper-mask"></div>
+      </div>
+      <div class="field mt-4">
+        <label class="field-label" for="avatar-zoom">Zoom</label>
+        <input type="range" id="avatar-zoom" min="1" max="3" step="0.01" value="1" style="width:100%">
+      </div>
+    `,
+    footer: `<button class="btn btn-secondary" id="avatar-cancel">Cancel</button>
+             <button class="btn btn-primary" id="avatar-save">Save Photo</button>`,
+    onClose: () => URL.revokeObjectURL(objectUrl)
+  });
+
+  const img  = document.getElementById('avatar-cropper-img');
+  const wrap = document.getElementById('avatar-cropper-wrap');
+  const zoomSlider = document.getElementById('avatar-zoom');
+
+  function clampAndApply() {
+    const scale = baseScale * state.zoom;
+    const w = naturalW * scale, h = naturalH * scale;
+    const maxX = Math.max(0, (w - AVATAR_EDITOR_SIZE) / 2);
+    const maxY = Math.max(0, (h - AVATAR_EDITOR_SIZE) / 2);
+    state.x = Math.max(-maxX, Math.min(maxX, state.x));
+    state.y = Math.max(-maxY, Math.min(maxY, state.y));
+    img.style.width  = w + 'px';
+    img.style.height = h + 'px';
+    img.style.left = `calc(50% - ${w / 2 - state.x}px)`;
+    img.style.top  = `calc(50% - ${h / 2 - state.y}px)`;
+  }
+
+  img.onload = () => {
+    naturalW = img.naturalWidth;
+    naturalH = img.naturalHeight;
+    baseScale = Math.max(AVATAR_EDITOR_SIZE / naturalW, AVATAR_EDITOR_SIZE / naturalH);
+    state.zoom = 1; state.x = 0; state.y = 0;
+    clampAndApply();
+  };
+
+  zoomSlider.addEventListener('input', () => {
+    state.zoom = parseFloat(zoomSlider.value);
+    clampAndApply();
+  });
+
+  wrap.addEventListener('pointerdown', e => {
+    dragging = true;
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    startX = state.x; startY = state.y;
+    wrap.setPointerCapture(e.pointerId);
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    state.x = startX + (e.clientX - dragStartX);
+    state.y = startY + (e.clientY - dragStartY);
+    clampAndApply();
+  });
+  wrap.addEventListener('pointerup',     () => { dragging = false; });
+  wrap.addEventListener('pointercancel', () => { dragging = false; });
+
+  document.getElementById('avatar-cancel').addEventListener('click', () => closeModal());
+
+  document.getElementById('avatar-save').addEventListener('click', () => {
+    const scale = baseScale * state.zoom;
+    const outRatio = AVATAR_OUTPUT_SIZE / AVATAR_EDITOR_SIZE;
+    const w = naturalW * scale * outRatio, h = naturalH * scale * outRatio;
+    const drawX = (AVATAR_OUTPUT_SIZE - w) / 2 + state.x * outRatio;
+    const drawY = (AVATAR_OUTPUT_SIZE - h) / 2 + state.y * outRatio;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = AVATAR_OUTPUT_SIZE;
+    canvas.height = AVATAR_OUTPUT_SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, drawX, drawY, w, h);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    closeModal();
+    onSave(dataUrl);
   });
 }
 
