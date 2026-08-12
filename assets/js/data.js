@@ -35,6 +35,16 @@ const Auth = {
     clearToken();
   },
 
+  checkActivation(token) {
+    return api('/auth/check-activation', { method: 'POST', body: { token } });
+  },
+
+  async activate(token, password) {
+    const { token: sessToken, earlyAdopter } = await api('/auth/activate', { method: 'POST', body: { token, password } });
+    setToken(sessToken);
+    return earlyAdopter;
+  },
+
   async currentEarlyAdopter() {
     if (!getToken()) return null;
     try {

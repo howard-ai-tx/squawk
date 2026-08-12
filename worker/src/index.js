@@ -43,6 +43,27 @@ export default {
         return json({ token, earlyAdopter: earlyAdopterToJson(row) }, 200, origin);
       }
 
+      if (path === '/auth/check-activation' && request.method === 'POST') {
+        const { token } = await request.json();
+        const row = await db.prepare('SELECT id, name FROM early_adopters WHERE activation_token = ?').bind(token).first();
+        return json({ valid: !!row, name: row?.name || null }, 200, origin);
+      }
+
+      if (path === '/auth/activate' && request.method === 'POST') {
+        const { token, password } = await request.json();
+        if (!password || password.length < 8) return error('Password must be at least 8 characters.', 400, origin);
+        const row = await db.prepare('SELECT * FROM early_adopters WHERE activation_token = ?').bind(token).first();
+        if (!row) return error('That link is invalid or has already been used.', 401, origin);
+        const { hash, salt } = await hashPassword(password);
+        await db.prepare('UPDATE early_adopters SET password_hash = ?, password_salt = ?, activation_token = NULL WHERE id = ?')
+          .bind(hash, salt, row.id).run();
+        const sessToken = genId('sess');
+        await db.prepare('INSERT INTO sessions (token, ea_id, expires_at) VALUES (?, ?, ?)')
+          .bind(sessToken, row.id, Date.now() + SESSION_TTL_MS).run();
+        const updated = await getEARow(db, row.id);
+        return json({ token: sessToken, earlyAdopter: earlyAdopterToJson(updated) }, 200, origin);
+      }
+
       if (path === '/auth/logout' && request.method === 'POST') {
         const authHeader = request.headers.get('Authorization') || '';
         const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;

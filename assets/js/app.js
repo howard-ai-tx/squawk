@@ -12,7 +12,7 @@ function showView(name) {
   if (el) el.classList.remove('hidden');
 
   const shell = document.getElementById('app-shell');
-  if (name === 'login') {
+  if (name === 'login' || name === 'activate') {
     shell.classList.add('hidden');
   } else {
     shell.classList.remove('hidden');
@@ -49,6 +49,18 @@ function toast(message, type = 'success') {
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 async function init() {
+  const activationToken = new URLSearchParams(window.location.search).get('activate');
+  if (activationToken) {
+    const { valid, name } = await DB.Auth.checkActivation(activationToken);
+    if (valid) {
+      renderActivateView(activationToken, name);
+      showView('activate');
+      return;
+    }
+    // Invalid/used token — drop the query param and fall through to normal login.
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
   currentEA = await DB.Auth.currentEarlyAdopter();
   if (!currentEA) {
     renderLoginView();
@@ -56,6 +68,57 @@ async function init() {
   } else {
     showView('home');
   }
+}
+
+function renderActivateView(token, name) {
+  const view = document.querySelector('[data-view="activate"]');
+  view.innerHTML = `
+    <div class="login-page">
+      <div class="login-card">
+        <p class="login-wordmark">Howard AI</p>
+        <h1 class="login-title">Welcome${name ? ', ' + escHtml(name.split(' ')[0]) : ''}</h1>
+        <p class="login-subtitle">Set a password to activate your account.</p>
+        <form class="login-form" id="activate-form" novalidate>
+          <div class="field">
+            <label class="field-label" for="activate-password">Password</label>
+            <input class="input" type="password" id="activate-password" autocomplete="new-password" required>
+            <p class="field-helper">At least 8 characters.</p>
+          </div>
+          <div id="activate-error" class="field-error hidden">
+            <i class="ti ti-alert-circle" style="font-size:16px"></i>
+            <span id="activate-error-text"></span>
+          </div>
+          <button type="submit" class="btn btn-primary w-full" id="activate-btn">Set Password &amp; Sign In</button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('activate-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = document.getElementById('activate-error');
+    errEl.classList.add('hidden');
+    const password = document.getElementById('activate-password').value;
+    if (password.length < 8) {
+      document.getElementById('activate-error-text').textContent = 'Password must be at least 8 characters.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    const btn = document.getElementById('activate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Setting password...';
+    try {
+      currentEA = await DB.Auth.activate(token, password);
+      window.history.replaceState({}, '', window.location.pathname);
+      showView('home');
+    } catch (err) {
+      document.getElementById('activate-error-text').textContent = err.message;
+      errEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Set Password & Sign In';
+    }
+  });
 }
 
 function renderLoginView() {

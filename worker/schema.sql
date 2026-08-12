@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS early_adopters (
   email                 TEXT NOT NULL UNIQUE,
   password_hash         TEXT,
   password_salt         TEXT,
+  activation_token      TEXT UNIQUE,                     -- one-time link token; NULL once password is set
   enrollment_date       TEXT NOT NULL,
   referral_source       TEXT,                          -- how they joined (nullable)
   referral_code         TEXT NOT NULL UNIQUE,           -- what they hand out to refer others
