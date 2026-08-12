@@ -1,7 +1,7 @@
 // ─── CORS ────────────────────────────────────────────────────────────────────
 
 const ALLOWED_ORIGINS = [
-  'https://squawk.howardai.us',
+  'https://earlyadopters.howardai.us',
   'http://localhost:4200'
 ];
 
@@ -33,10 +33,6 @@ export function genId(prefix = '') {
   return prefix ? `${prefix}_${id}` : id;
 }
 
-export function genOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
 // ─── PASSWORD HASHING (PBKDF2-SHA256 via Web Crypto) ────────────────────────
 
 function bytesToHex(bytes) {
@@ -66,58 +62,29 @@ export async function verifyPassword(password, saltHex, expectedHash) {
 }
 
 // ─── ROW <-> JSON SHAPING ────────────────────────────────────────────────────
+// EA-ID is internal-only and intentionally omitted from earlyAdopterToJson —
+// it must never be surfaced to the Early Adopter in the UI.
 
-export function userToJson(row, devices = []) {
+export function earlyAdopterToJson(row) {
   return {
-    id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role,
-    otp: row.otp,
-    otpUsed: !!row.otp_used,
-    avatarDataUrl: row.avatar_data_url,
-    settings: JSON.parse(row.settings_json || '{}'),
-    devices: devices.map(deviceToJson),
-    createdAt: row.created_at,
-    createdBy: row.created_by
+    enrollmentDate: row.enrollment_date,
+    referralSource: row.referral_source,
+    referralCode: row.referral_code,
+    installStatus: row.install_status,
+    representingAckAt: row.representing_ack_at
   };
 }
 
-export function deviceToJson(row) {
-  return { id: row.id, name: row.name, serialNumber: row.serial_number, model: row.model, dateAdded: row.date_added };
+export function feedbackToJson(row) {
+  return { id: row.id, message: row.message, createdAt: row.created_at };
 }
 
-export function draftToJson(row) {
-  return {
-    id: row.id, btId: row.bt_id, title: row.title, category: row.category, subcategory: row.subcategory,
-    description: row.description, deviceId: row.device_id, model: row.model,
-    eventTimestamp: row.event_timestamp, timestampPrecision: row.timestamp_precision,
-    attachmentData: row.attachment_json ? JSON.parse(row.attachment_json) : null,
-    createdAt: row.created_at, updatedAt: row.updated_at
-  };
+export function bugToJson(row) {
+  return { id: row.id, whatHappened: row.what_happened, expected: row.expected, urgency: row.urgency, createdAt: row.created_at };
 }
 
-export function submissionToJson(row) {
-  return {
-    id: row.id, btId: row.bt_id, title: row.title, category: row.category, subcategory: row.subcategory,
-    description: row.description, deviceId: row.device_id, model: row.model,
-    eventTimestamp: row.event_timestamp, timestampPrecision: row.timestamp_precision,
-    attachmentData: row.attachment_json ? JSON.parse(row.attachment_json) : null,
-    submittedAt: row.submitted_at
-  };
-}
-
-export function eventToJson(row) {
-  return { id: row.id, submissionId: row.submission_id, type: row.type, timestamp: row.timestamp, repId: row.rep_id, data: JSON.parse(row.data_json || '{}') };
-}
-
-export function newsToJson(row) {
-  return {
-    id: row.id, title: row.title, subtitle: row.subtitle,
-    tags: JSON.parse(row.tags_json || '[]'),
-    image: row.image_json ? JSON.parse(row.image_json) : null,
-    bodyHtml: row.body_html,
-    authorId: row.author_id, authorName: row.author_name,
-    publishedAt: row.published_at
-  };
+export function contactToJson(row) {
+  return { id: row.id, message: row.message, createdAt: row.created_at };
 }
