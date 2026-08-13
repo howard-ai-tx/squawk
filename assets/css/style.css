@@ -86,7 +86,7 @@ p, .body { font-size: 16px; font-weight: 400; }
   gap: var(--space-3);
 }
 
-.app-wordmark { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.app-logo { height: 22px; width: auto; display: block; }
 
 .app-nav { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
 
@@ -265,7 +265,7 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 }
 
 .login-card { width: 100%; max-width: 380px; }
-.login-wordmark { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: var(--space-8); }
+.login-logo { height: 28px; width: auto; display: block; margin: 0 auto var(--space-8); }
 .login-title { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: var(--space-2); }
 .login-subtitle { font-size: 15px; color: var(--text-secondary); text-align: center; margin-bottom: var(--space-8); }
 .login-form { display: flex; flex-direction: column; gap: var(--space-4); }

@@ -75,7 +75,7 @@ function renderActivateView(token, name) {
   view.innerHTML = `
     <div class="login-page">
       <div class="login-card">
-        <p class="login-wordmark">Howard AI</p>
+        <img class="login-logo" src="logo-dark.png" alt="Howard AI">
         <h1 class="login-title">Welcome${name ? ', ' + escHtml(name.split(' ')[0]) : ''}</h1>
         <p class="login-subtitle">Set a password to activate your account.</p>
         <form class="login-form" id="activate-form" novalidate>
@@ -126,7 +126,7 @@ function renderLoginView() {
   view.innerHTML = `
     <div class="login-page">
       <div class="login-card">
-        <p class="login-wordmark">Howard AI</p>
+        <img class="login-logo" src="logo-dark.png" alt="Howard AI">
         <h1 class="login-title">Early Adopters</h1>
         <p class="login-subtitle">Sign in to your account.</p>
         <form class="login-form" id="login-form" novalidate>
