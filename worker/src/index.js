@@ -34,6 +34,9 @@ export default {
       if (path === '/auth/login' && request.method === 'POST') {
         const { email, password } = await request.json();
         const row = await db.prepare('SELECT * FROM early_adopters WHERE lower(email) = lower(?)').bind(email).first();
+        if (row && row.activation_token && !row.password_hash) {
+          return error('This account hasn’t been activated yet. Check for your activation link, or ask Hendrik or Tucker to resend it.', 401, origin);
+        }
         if (!row || !row.password_hash) return error('Email or password is incorrect.', 401, origin);
         const ok = await verifyPassword(password, row.password_salt, row.password_hash);
         if (!ok) return error('Email or password is incorrect.', 401, origin);
