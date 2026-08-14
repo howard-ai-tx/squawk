@@ -286,7 +286,7 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
   box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
 }
 
-.choice-chip-emoji { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.choice-chip i { flex-shrink: 0; }
 
 .choice-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .choice-row .choice-chip { flex: 1; min-width: 100px; justify-content: center; text-align: center; }
@@ -310,8 +310,7 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
   box-shadow: var(--shadow-card);
 }
 
-.form-section-title { font-size: 15px; font-weight: 700; margin-bottom: var(--space-1); }
-.form-section-subtitle { font-size: 13px; color: var(--text-tertiary); margin-bottom: var(--space-4); }
+.form-section-title { font-size: 15px; font-weight: 700; margin-bottom: var(--space-4); }
 
 .divider { border: none; border-top: 1px solid var(--divider); }
 
@@ -332,18 +331,6 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-placeholder); }
 .status-pill.is-installed .status-dot { background: var(--success); box-shadow: 0 0 0 3px rgba(52,199,89,0.18); }
 .status-pill.is-scheduled .status-dot { background: var(--warning); box-shadow: 0 0 0 3px rgba(255,159,10,0.18); }
-
-/* ─── ENVIRONMENT CHIPS (auto-captured, read-only) ───────────────── */
-
-.env-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--space-3);
-}
-
-.env-item { }
-.env-item-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-placeholder); margin-bottom: 2px; }
-.env-item-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
 /* ─── ALERT ───────────────────────────────────────────────────── */
 

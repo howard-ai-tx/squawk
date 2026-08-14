@@ -265,13 +265,13 @@ function renderFeedback() {
 // ─── REPORT A BUG ─────────────────────────────────────────────────────────────
 
 const ISSUE_TYPES = [
-  { value: 'hardware',    emoji: '🔧', label: 'Hardware', hint: 'Your Howard Core unit' },
-  { value: 'software',    emoji: '💻', label: 'Software',  hint: 'Arken behaving unexpectedly' },
-  { value: 'usability',   emoji: '🎨', label: 'Usability', hint: 'Confusing or hard to use' },
-  { value: 'performance', emoji: '⚡', label: 'Performance', hint: 'Slow or laggy' },
-  { value: 'feature',     emoji: '💡', label: 'Feature request', hint: 'Something you wish it could do' },
-  { value: 'security',    emoji: '🔒', label: 'Security / Privacy', hint: 'A security or privacy concern' },
-  { value: 'other',       emoji: '❓', label: 'Other / Question', hint: '' }
+  { value: 'hardware',    icon: 'ti-tool',           label: 'Hardware' },
+  { value: 'software',    icon: 'ti-code',           label: 'Software' },
+  { value: 'usability',   icon: 'ti-layout',         label: 'Usability' },
+  { value: 'performance', icon: 'ti-gauge',          label: 'Performance' },
+  { value: 'feature',     icon: 'ti-bulb',           label: 'Feature request' },
+  { value: 'security',    icon: 'ti-shield-lock',    label: 'Security / Privacy' },
+  { value: 'other',       icon: 'ti-help-circle',    label: 'Other / Question' }
 ];
 
 const SEVERITIES = [
@@ -301,34 +301,13 @@ const YES_NO = [
 let bugState = {};
 let bugAttachment = null;
 
-function captureEnvironment() {
-  const ua = navigator.userAgent;
-  let browser = 'Unknown browser';
-  if (/Edg\//.test(ua)) browser = 'Edge';
-  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
-  else if (/Firefox\//.test(ua)) browser = 'Firefox';
-  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
-
-  let os = 'Unknown OS';
-  if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
-  else if (/Mac OS X/.test(ua)) os = 'macOS';
-  else if (/Android/.test(ua)) os = 'Android';
-  else if (/Windows/.test(ua)) os = 'Windows';
-  else if (/Linux/.test(ua)) os = 'Linux';
-
-  const device = /iPhone|Android.*Mobile/.test(ua) ? 'Mobile' : (/iPad|Tablet|Android(?!.*Mobile)/.test(ua) ? 'Tablet' : 'Desktop');
-  const screen = `${window.screen.width}×${window.screen.height}`;
-
-  return { browser, os, device, screen };
-}
-
-function choiceGroupHtml(id, options, { emoji = false, grid = false } = {}) {
+function choiceGroupHtml(id, options, { icon = false, grid = false } = {}) {
   const cls = grid ? 'choice-grid' : 'choice-row';
   return `
     <div class="${cls}" id="${id}">
       ${options.map(o => `
         <button type="button" class="choice-chip" data-value="${o.value}">
-          ${emoji ? `<span class="choice-chip-emoji">${o.emoji}</span>` : ''}
+          ${icon ? `<i class="ti ${o.icon}" style="font-size:18px"></i>` : ''}
           <span>${escHtml(o.label)}</span>
         </button>
       `).join('')}
@@ -349,7 +328,6 @@ function wireChoiceGroup(id, stateKey) {
 function renderBug() {
   bugState = {};
   bugAttachment = null;
-  const env = captureEnvironment();
   const view = document.querySelector('[data-view="bug"]');
 
   view.innerHTML = `
@@ -360,14 +338,14 @@ function renderBug() {
 
       <div class="form-section">
         <p class="form-section-title">Overview</p>
-        <p class="form-section-subtitle">A short title and where the problem lives.</p>
         <div class="field mb-4">
           <label class="field-label" for="bug-title">Issue title <span class="field-required">Required</span></label>
           <input class="input" type="text" id="bug-title" placeholder="e.g. Arken stops responding after a long pause">
+          <p class="field-helper">A short, descriptive title.</p>
         </div>
         <div class="field mb-4">
           <label class="field-label">Issue type <span class="field-required">Required</span></label>
-          ${choiceGroupHtml('bug-type-group', ISSUE_TYPES, { emoji: true, grid: true })}
+          ${choiceGroupHtml('bug-type-group', ISSUE_TYPES, { icon: true, grid: true })}
         </div>
         <div class="field">
           <label class="field-label">Severity <span class="field-required">Required</span></label>
@@ -396,24 +374,13 @@ function renderBug() {
       </div>
 
       <div class="form-section">
-        <p class="form-section-title">Environment</p>
-        <p class="form-section-subtitle">Captured automatically.</p>
-        <div class="env-grid">
-          <div class="env-item"><p class="env-item-label">Browser</p><p class="env-item-value">${escHtml(env.browser)}</p></div>
-          <div class="env-item"><p class="env-item-label">Operating system</p><p class="env-item-value">${escHtml(env.os)}</p></div>
-          <div class="env-item"><p class="env-item-label">Device</p><p class="env-item-value">${escHtml(env.device)}</p></div>
-          <div class="env-item"><p class="env-item-label">Screen size</p><p class="env-item-value">${escHtml(env.screen)}</p></div>
-        </div>
-      </div>
-
-      <div class="form-section">
         <p class="form-section-title">Attachments</p>
-        <p class="form-section-subtitle">A screenshot, recording, or log file. Please don't include passwords or other sensitive information.</p>
         <div class="file-drop" id="bug-file-drop" tabindex="0" role="button" aria-label="Attach a file">
           <input type="file" id="bug-file-input" accept="image/*,video/*,.txt,.log">
           <i class="ti ti-paperclip" style="font-size:22px;color:var(--text-placeholder);margin-bottom:6px"></i>
           <p class="caption text-placeholder" id="bug-file-status">Click to attach a file</p>
         </div>
+        <p class="field-helper mt-2">A screenshot, recording, or log file. Please don't include passwords or other sensitive information.</p>
       </div>
 
       <div class="form-section">
@@ -430,12 +397,14 @@ function renderBug() {
 
       <div class="form-section">
         <p class="form-section-title">Diagnostic information</p>
-        <p class="form-section-subtitle">Optional — console output, an error message, a request ID, a timestamp.</p>
-        <textarea class="input" id="bug-diagnostics" style="min-height:80px;font-family:ui-monospace,monospace;font-size:13.5px"></textarea>
+        <div class="field">
+          <label class="field-label" for="bug-diagnostics">Console output, error message, request ID, or timestamp <span style="color:var(--text-placeholder);font-size:13px">Optional</span></label>
+          <textarea class="input" id="bug-diagnostics" style="min-height:80px;font-family:ui-monospace,monospace;font-size:13.5px"></textarea>
+        </div>
       </div>
 
       <div class="form-section">
-        <p class="form-section-title">About your testing</p>
+        <p class="form-section-title">About your experience</p>
         <div class="field mb-4">
           <label class="field-label" for="bug-context">What were you trying to accomplish?</label>
           <textarea class="input" id="bug-context" style="min-height:70px"></textarea>
@@ -445,7 +414,7 @@ function renderBug() {
           ${choiceGroupHtml('bug-regression-group', YES_NO_UNSURE)}
         </div>
         <div class="field mb-4">
-          <label class="field-label">Is this blocking you from testing a specific feature?</label>
+          <label class="field-label">Is this blocking you from using a specific feature?</label>
           ${choiceGroupHtml('bug-blocking-group', YES_NO)}
         </div>
         <div class="field">
@@ -513,7 +482,6 @@ function renderBug() {
         stepsToReproduce: document.getElementById('bug-steps').value.trim(),
         expected,
         actual: document.getElementById('bug-actual').value.trim(),
-        environment: captureEnvironment(),
         attachment: bugAttachment,
         frequency: bugState.frequency || null,
         canReproduce: bugState.canReproduce || null,
