@@ -78,7 +78,11 @@ export function earlyAdopterToJson(row) {
 }
 
 export function feedbackToJson(row) {
-  return { id: row.id, message: row.message, createdAt: row.created_at };
+  return {
+    id: row.id, feedbackType: row.feedback_type, importance: row.importance,
+    message: row.message, whereEncountered: row.where_encountered, additionalNotes: row.additional_notes,
+    createdAt: row.created_at
+  };
 }
 
 export function bugToJson(row) {

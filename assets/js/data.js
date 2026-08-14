@@ -64,7 +64,7 @@ const Representing = {
 };
 
 const Feedback = {
-  submit(message) { return api('/feedback', { method: 'POST', body: { message } }); }
+  submit(fields) { return api('/feedback', { method: 'POST', body: fields }); }
 };
 
 const Bugs = {

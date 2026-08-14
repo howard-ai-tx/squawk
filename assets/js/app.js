@@ -214,21 +214,73 @@ function renderHome() {
   `;
 }
 
-// ─── SUBMIT FEEDBACK ──────────────────────────────────────────────────────────
+// ─── FEEDBACK / SUGGESTIONS ───────────────────────────────────────────────────
+
+const FEEDBACK_TYPES = [
+  { value: 'suggestion', icon: 'ti-bulb',            label: 'Suggestion / idea' },
+  { value: 'confusing',  icon: 'ti-help-circle',      label: 'Confusing / difficult to use' },
+  { value: 'liked',      icon: 'ti-heart',            label: 'Something I really liked' },
+  { value: 'disliked',   icon: 'ti-thumb-down',       label: "Something I didn't like" },
+  { value: 'other',      icon: 'ti-message-circle',   label: 'Other' }
+];
+
+const IMPORTANCE_LEVELS = [
+  { value: 'nice_to_have',      label: 'Nice to have' },
+  { value: 'better_experience', label: 'Would make my experience better' },
+  { value: 'important',         label: 'Pretty important' },
+  { value: 'blocking',          label: 'Really important / blocking me' }
+];
+
+let feedbackState = {};
 
 function renderFeedback() {
+  feedbackState = {};
   const view = document.querySelector('[data-view="feedback"]');
+
   view.innerHTML = `
     <div class="page-header">
-      <h1 class="h1">Submit Feedback</h1>
+      <h1 class="h1">Feedback/Suggestions</h1>
     </div>
     <form id="feedback-form" novalidate>
+
       <div class="form-section">
+        <p class="form-section-title">Overview</p>
+        <div class="field mb-4">
+          <label class="field-label">What type of feedback is this? <span class="field-required">Required</span></label>
+          ${choiceGroupHtml('feedback-type-group', FEEDBACK_TYPES, { icon: true, grid: true })}
+        </div>
         <div class="field">
-          <label class="field-label" for="feedback-message">Your feedback</label>
-          <textarea class="input" id="feedback-message" placeholder="Share anything — a request, a reaction, a thought."></textarea>
+          <label class="field-label">How important do you think this is? <span class="field-required">Required</span></label>
+          ${choiceGroupHtml('feedback-importance-group', IMPORTANCE_LEVELS)}
+          <div id="feedback-blocking-note" class="alert alert-info mt-2 hidden">
+            <i class="ti ti-info-circle" style="font-size:18px;color:var(--action);flex-shrink:0"></i>
+            <p class="body" style="font-size:14px">This sounds like it might be something broken rather than feedback. If Howard isn't working the way it should, a <a href="#" id="feedback-to-bug-link" style="color:var(--action);font-weight:700">Bug Report</a> gets it in front of us faster.</p>
+          </div>
         </div>
       </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Tell us about it</p>
+        <div class="field">
+          <label class="field-label" for="feedback-message">Details <span class="field-required">Required</span></label>
+          <textarea class="input" id="feedback-message" style="min-height:120px"></textarea>
+          <p class="field-helper">What happened, what did you notice, or what's your idea?</p>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="field mb-4">
+          <label class="field-label" for="feedback-where">Where did you encounter this?</label>
+          <input class="input" type="text" id="feedback-where" placeholder="e.g. a feature, page, or screen">
+          <p class="field-helper">Optional.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="feedback-more">Anything else?</label>
+          <textarea class="input" id="feedback-more" style="min-height:80px"></textarea>
+          <p class="field-helper">Optional.</p>
+        </div>
+      </div>
+
       <div id="feedback-error" class="field-error hidden mb-4">
         <i class="ti ti-alert-circle" style="font-size:16px"></i>
         <span id="feedback-error-text"></span>
@@ -237,26 +289,44 @@ function renderFeedback() {
     </form>
   `;
 
+  wireChoiceGroup('feedback-type-group', feedbackState, 'feedbackType');
+  wireChoiceGroup('feedback-importance-group', feedbackState, 'importance');
+
+  document.getElementById('feedback-importance-group').addEventListener('click', () => {
+    document.getElementById('feedback-blocking-note').classList.toggle('hidden', feedbackState.importance !== 'blocking');
+  });
+  document.getElementById('feedback-to-bug-link').addEventListener('click', e => {
+    e.preventDefault();
+    showView('bug');
+  });
+
   document.getElementById('feedback-form').addEventListener('submit', async e => {
     e.preventDefault();
     const message = document.getElementById('feedback-message').value.trim();
     const errEl = document.getElementById('feedback-error');
     errEl.classList.add('hidden');
-    if (!message) {
-      document.getElementById('feedback-error-text').textContent = 'Please enter your feedback.';
+
+    if (!feedbackState.feedbackType || !feedbackState.importance || !message) {
+      document.getElementById('feedback-error-text').textContent = 'Please select a type, an importance level, and tell us about it.';
       errEl.classList.remove('hidden');
       return;
     }
+
     const btn = document.getElementById('feedback-btn');
     btn.disabled = true;
     try {
-      await DB.Feedback.submit(message);
+      await DB.Feedback.submit({
+        feedbackType: feedbackState.feedbackType,
+        importance: feedbackState.importance,
+        message,
+        whereEncountered: document.getElementById('feedback-where').value.trim(),
+        additionalNotes: document.getElementById('feedback-more').value.trim()
+      });
       toast('Feedback submitted.');
-      document.getElementById('feedback-message').value = '';
+      renderFeedback();
     } catch (err) {
       document.getElementById('feedback-error-text').textContent = err.message;
       errEl.classList.remove('hidden');
-    } finally {
       btn.disabled = false;
     }
   });
@@ -315,12 +385,12 @@ function choiceGroupHtml(id, options, { icon = false, grid = false } = {}) {
   `;
 }
 
-function wireChoiceGroup(id, stateKey) {
+function wireChoiceGroup(id, stateObj, stateKey) {
   document.getElementById(id).querySelectorAll('.choice-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       document.getElementById(id).querySelectorAll('.choice-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      bugState[stateKey] = chip.dataset.value;
+      stateObj[stateKey] = chip.dataset.value;
     });
   });
 }
@@ -431,13 +501,13 @@ function renderBug() {
     </form>
   `;
 
-  wireChoiceGroup('bug-type-group', 'issueType');
-  wireChoiceGroup('bug-severity-group', 'severity');
-  wireChoiceGroup('bug-frequency-group', 'frequency');
-  wireChoiceGroup('bug-reproduce-group', 'canReproduce');
-  wireChoiceGroup('bug-regression-group', 'regression');
-  wireChoiceGroup('bug-blocking-group', 'blockingFeature');
-  wireChoiceGroup('bug-followup-group', 'followUpOk');
+  wireChoiceGroup('bug-type-group', bugState, 'issueType');
+  wireChoiceGroup('bug-severity-group', bugState, 'severity');
+  wireChoiceGroup('bug-frequency-group', bugState, 'frequency');
+  wireChoiceGroup('bug-reproduce-group', bugState, 'canReproduce');
+  wireChoiceGroup('bug-regression-group', bugState, 'regression');
+  wireChoiceGroup('bug-blocking-group', bugState, 'blockingFeature');
+  wireChoiceGroup('bug-followup-group', bugState, 'followUpOk');
 
   const fileDrop = document.getElementById('bug-file-drop');
   const fileInput = document.getElementById('bug-file-input');
@@ -599,7 +669,7 @@ function renderRefer() {
 
     <div class="form-section">
       <p class="field-label mb-2">Your referral link</p>
-      <div class="referral-link-box" id="referral-link">${link}</div>
+      <a class="referral-link-box" id="referral-link" href="${link}" target="_blank" rel="noopener">${link}</a>
       <button class="btn btn-secondary btn-sm mt-2" id="copy-link-btn">
         <i class="ti ti-copy" style="font-size:16px"></i> Copy Link
       </button>
@@ -635,12 +705,33 @@ function escHtml(str) {
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 
+function closeMobileNav() {
+  document.getElementById('app-shell').classList.remove('nav-open');
+  const toggle = document.getElementById('app-nav-toggle');
+  toggle.innerHTML = '<i class="ti ti-menu-2" style="font-size:20px"></i>';
+  toggle.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.app-nav-link[data-target]').forEach(btn => {
-    btn.addEventListener('click', () => showView(btn.dataset.target));
+    btn.addEventListener('click', () => {
+      showView(btn.dataset.target);
+      closeMobileNav();
+    });
+  });
+
+  document.getElementById('app-nav-toggle')?.addEventListener('click', () => {
+    const shell = document.getElementById('app-shell');
+    const open = shell.classList.toggle('nav-open');
+    const toggle = document.getElementById('app-nav-toggle');
+    toggle.innerHTML = `<i class="ti ${open ? 'ti-x' : 'ti-menu-2'}" style="font-size:20px"></i>`;
+    toggle.setAttribute('aria-expanded', String(open));
+    document.body.style.overflow = open ? 'hidden' : '';
   });
 
   document.getElementById('btn-signout')?.addEventListener('click', async () => {
+    closeMobileNav();
     await DB.Auth.logout();
     currentEA = null;
     renderLoginView();

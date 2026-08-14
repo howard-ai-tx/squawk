@@ -97,11 +97,13 @@ export default {
 
       // ── FEEDBACK ──────────────────────────────────────────────────────────
       if (path === '/feedback' && request.method === 'POST') {
-        const { message } = await request.json();
-        if (!message || !message.trim()) return error('Feedback cannot be empty.', 400, origin);
+        const f = await request.json();
+        if (!f.feedbackType || !f.importance || !f.message || !f.message.trim()) {
+          return error('Feedback type, importance, and details are required.', 400, origin);
+        }
         const id = genId('fb');
-        await db.prepare('INSERT INTO feedback (id, ea_id, message, created_at) VALUES (?, ?, ?, ?)')
-          .bind(id, me.id, message.trim(), new Date().toISOString()).run();
+        await db.prepare(`INSERT INTO feedback (id, ea_id, feedback_type, importance, message, where_encountered, additional_notes, created_at) VALUES (?,?,?,?,?,?,?,?)`)
+          .bind(id, me.id, f.feedbackType, f.importance, f.message.trim(), f.whereEncountered?.trim() || null, f.additionalNotes?.trim() || null, new Date().toISOString()).run();
         const row = await db.prepare('SELECT * FROM feedback WHERE id = ?').bind(id).first();
         return json(feedbackToJson(row), 200, origin);
       }

@@ -16,10 +16,14 @@ CREATE TABLE IF NOT EXISTS early_adopters (
 );
 
 CREATE TABLE IF NOT EXISTS feedback (
-  id            TEXT PRIMARY KEY,
-  ea_id         TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,
-  message       TEXT NOT NULL,
-  created_at    TEXT NOT NULL
+  id                  TEXT PRIMARY KEY,
+  ea_id               TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,
+  feedback_type       TEXT NOT NULL,   -- 'suggestion'|'confusing'|'liked'|'disliked'|'other'
+  importance          TEXT NOT NULL,   -- 'nice_to_have'|'better_experience'|'important'|'blocking'
+  message             TEXT NOT NULL,
+  where_encountered   TEXT,
+  additional_notes    TEXT,
+  created_at          TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS bug_reports (
