@@ -7,7 +7,7 @@
   <meta name="description" content="Howard AI Early Adopter Platform.">
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="stylesheet" href="assets/css/style.css?v=6">
+  <link rel="stylesheet" href="assets/css/style.css?v=8">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
 </head>
 <body>
@@ -37,6 +37,17 @@
           <i class="ti ti-logout" style="font-size:17px"></i> Sign Out
         </button>
       </nav>
+      <nav class="app-nav" id="admin-nav" aria-label="Administrator navigation">
+        <button class="app-nav-link" data-target="admin-overview">Overview</button>
+        <button class="app-nav-link" data-target="admin-eas">Early Adopters</button>
+        <button class="app-nav-link" data-target="admin-feedback">Feedback</button>
+        <button class="app-nav-link" data-target="admin-bugs">Bug Reports</button>
+        <button class="app-nav-link" data-target="admin-contact">Messages</button>
+        <span class="app-nav-divider-v" aria-hidden="true"></span>
+        <button class="app-nav-link app-nav-signout" id="btn-signout-admin">
+          <i class="ti ti-logout" style="font-size:17px"></i> Sign Out
+        </button>
+      </nav>
     </header>
 
     <main class="app-main">
@@ -46,12 +57,18 @@
       <div data-view="contact"></div>
       <div data-view="representing"></div>
       <div data-view="refer"></div>
+      <div data-view="admin-overview"></div>
+      <div data-view="admin-eas"></div>
+      <div data-view="admin-ea-detail"></div>
+      <div data-view="admin-feedback"></div>
+      <div data-view="admin-bugs"></div>
+      <div data-view="admin-contact"></div>
     </main>
   </div>
 
   <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="assets/js/data.js?v=7"></script>
-  <script src="assets/js/app.js?v=13"></script>
+  <script src="assets/js/data.js?v=9"></script>
+  <script src="assets/js/app.js?v=17"></script>
 </body>
 </html>

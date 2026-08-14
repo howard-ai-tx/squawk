@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS early_adopters (
   referral_code         TEXT NOT NULL UNIQUE,           -- what they hand out to refer others
   install_status        TEXT NOT NULL DEFAULT 'scheduled', -- 'scheduled' | 'installed'
   representing_ack_at   TEXT,                           -- NULL until acknowledged
+  is_admin              INTEGER NOT NULL DEFAULT 0,      -- 1 = can view the Administrator Platform
   created_at            TEXT NOT NULL
 );
 

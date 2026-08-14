@@ -73,7 +73,29 @@ export function earlyAdopterToJson(row) {
     referralSource: row.referral_source,
     referralCode: row.referral_code,
     installStatus: row.install_status,
-    representingAckAt: row.representing_ack_at
+    representingAckAt: row.representing_ack_at,
+    isAdmin: !!row.is_admin
+  };
+}
+
+// Admin-facing shape: unlike earlyAdopterToJson, this intentionally includes
+// the internal id (needed to address a specific EA from the admin panel).
+export function earlyAdopterToAdminJson(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    enrollmentDate: row.enrollment_date,
+    referralSource: row.referral_source,
+    referralCode: row.referral_code,
+    installStatus: row.install_status,
+    representingAckAt: row.representing_ack_at,
+    isAdmin: !!row.is_admin,
+    pendingActivation: !!row.activation_token && !row.password_hash,
+    createdAt: row.created_at,
+    feedbackCount: row.feedback_count ?? undefined,
+    bugCount: row.bug_count ?? undefined,
+    contactCount: row.contact_count ?? undefined
   };
 }
 
@@ -101,4 +123,18 @@ export function bugToJson(row) {
 
 export function contactToJson(row) {
   return { id: row.id, message: row.message, createdAt: row.created_at };
+}
+
+// ─── ADMIN-FACING VARIANTS (include the submitting EA's identity) ──────────
+
+export function feedbackToAdminJson(row) {
+  return { ...feedbackToJson(row), eaId: row.ea_id, eaName: row.ea_name, eaEmail: row.ea_email };
+}
+
+export function bugToAdminJson(row) {
+  return { ...bugToJson(row), eaId: row.ea_id, eaName: row.ea_name, eaEmail: row.ea_email };
+}
+
+export function contactToAdminJson(row) {
+  return { ...contactToJson(row), eaId: row.ea_id, eaName: row.ea_name, eaEmail: row.ea_email };
 }

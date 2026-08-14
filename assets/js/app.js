@@ -28,6 +28,11 @@ function showView(name) {
   if (name === 'contact')       renderContact();
   if (name === 'representing')  renderRepresenting();
   if (name === 'refer')         renderRefer();
+  if (name === 'admin-overview') renderAdminOverview();
+  if (name === 'admin-eas')      renderAdminEAs();
+  if (name === 'admin-feedback') renderAdminFeedback();
+  if (name === 'admin-bugs')     renderAdminBugs();
+  if (name === 'admin-contact')  renderAdminContact();
 }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
@@ -66,8 +71,13 @@ async function init() {
     renderLoginView();
     showView('login');
   } else {
-    showView('home');
+    applyRoleShell();
+    showView(currentEA.isAdmin ? 'admin-overview' : 'home');
   }
+}
+
+function applyRoleShell() {
+  document.getElementById('app-shell').classList.toggle('is-admin', !!(currentEA && currentEA.isAdmin));
 }
 
 function wirePasswordToggle(inputId, btnId) {
@@ -184,7 +194,8 @@ function renderLoginView() {
       const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
       currentEA = await DB.Auth.login(email, password);
-      showView('home');
+      applyRoleShell();
+      showView(currentEA.isAdmin ? 'admin-overview' : 'home');
     } catch (err) {
       document.getElementById('login-error-text').textContent = err.message || 'Email or password is incorrect.';
       errEl.classList.remove('hidden');
@@ -692,6 +703,333 @@ function renderRefer() {
   });
 }
 
+// ─── ADMINISTRATOR PLATFORM ─────────────────────────────────────────────────
+// Read-only over Early Adopter data — admins view what EAs submit, they don't
+// create EA accounts here (that stays a deliberate, off-platform step).
+
+function findLabel(list, value) {
+  const match = list.find(o => o.value === value);
+  return match ? match.label : (value || '—');
+}
+
+function severityBadgeClass(sev) {
+  return { blocking: 'badge-red', high: 'badge-orange', medium: 'badge-yellow', low: 'badge-gray' }[sev] || 'badge-gray';
+}
+
+function importanceBadgeClass(imp) {
+  return { blocking: 'badge-red', important: 'badge-orange', better_experience: 'badge-blue', nice_to_have: 'badge-gray' }[imp] || 'badge-gray';
+}
+
+function statusBadgeClass(status) {
+  return status === 'installed' ? 'badge-green' : 'badge-gray';
+}
+
+async function withLoading(view, loadFn, renderFn) {
+  view.innerHTML = `<div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:20px"></i> Loading…</div>`;
+  try {
+    const data = await loadFn();
+    renderFn(data);
+  } catch (err) {
+    view.innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
+  }
+}
+
+function renderAdminOverview() {
+  const view = document.querySelector('[data-view="admin-overview"]');
+  withLoading(view, () => DB.Admin.overview(), o => {
+    const installed = o.installStatusCounts.installed || 0;
+    const scheduled = o.installStatusCounts.scheduled || 0;
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Overview</h1>
+        <p class="body admin-page-subtitle">A snapshot of every Early Adopter and what they've told us.</p>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <p class="stat-value">${o.totalEarlyAdopters}</p>
+          <p class="stat-label">Early Adopters</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-value">${installed}<span class="stat-value-of"> / ${o.totalEarlyAdopters}</span></p>
+          <p class="stat-label">Installed</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-value">${o.pendingActivation}</p>
+          <p class="stat-label">Awaiting Activation</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-value">${o.representingAcknowledged}<span class="stat-value-of"> / ${o.totalEarlyAdopters}</span></p>
+          <p class="stat-label">Acknowledged Representing HowardAI</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-value">${o.feedbackTotal}</p>
+          <p class="stat-label">Feedback Submissions</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-value">${o.bugTotal}</p>
+          <p class="stat-label">Bug Reports</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-value">${o.contactTotal}</p>
+          <p class="stat-label">Contact Messages</p>
+        </div>
+      </div>
+
+      <div class="admin-split">
+        <div class="form-section">
+          <p class="form-section-title">Bug reports by severity</p>
+          <div class="breakdown-list">
+            ${SEVERITIES.map(s => `
+              <div class="breakdown-row">
+                <span class="badge ${severityBadgeClass(s.value)}">${s.label}</span>
+                <span class="breakdown-count">${o.bugSeverityCounts[s.value] || 0}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="form-section">
+          <p class="form-section-title">Feedback by importance</p>
+          <div class="breakdown-list">
+            ${IMPORTANCE_LEVELS.map(i => `
+              <div class="breakdown-row">
+                <span class="badge ${importanceBadgeClass(i.value)}">${i.label}</span>
+                <span class="breakdown-count">${o.feedbackImportanceCounts[i.value] || 0}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+function renderAdminEAs() {
+  const view = document.querySelector('[data-view="admin-eas"]');
+  withLoading(view, () => DB.Admin.earlyAdopters(), eas => {
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Early Adopters</h1>
+        <p class="body admin-page-subtitle">${eas.length} account${eas.length === 1 ? '' : 's'}.</p>
+      </div>
+      <div class="field mb-4">
+        <input class="input" type="text" id="admin-ea-search" placeholder="Search by name or email…">
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Name</th><th>Email</th><th>Status</th><th>Representing</th>
+              <th>Feedback</th><th>Bugs</th><th>Messages</th><th>Enrolled</th>
+            </tr>
+          </thead>
+          <tbody id="admin-ea-tbody">
+            ${eas.map(ea => adminEaRow(ea)).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    document.querySelectorAll('.admin-table [data-ea-id]').forEach(row => {
+      row.addEventListener('click', () => {
+        showAdminEADetail(row.dataset.eaId);
+      });
+    });
+
+    document.getElementById('admin-ea-search').addEventListener('input', e => {
+      const q = e.target.value.trim().toLowerCase();
+      const filtered = eas.filter(ea => ea.name.toLowerCase().includes(q) || ea.email.toLowerCase().includes(q));
+      document.getElementById('admin-ea-tbody').innerHTML = filtered.map(ea => adminEaRow(ea)).join('');
+      document.querySelectorAll('.admin-table [data-ea-id]').forEach(row => {
+        row.addEventListener('click', () => showAdminEADetail(row.dataset.eaId));
+      });
+    });
+  });
+}
+
+function adminEaRow(ea) {
+  return `
+    <tr data-ea-id="${ea.id}" class="admin-table-row">
+      <td>${escHtml(ea.name)}</td>
+      <td>${escHtml(ea.email)}</td>
+      <td>
+        <span class="badge ${statusBadgeClass(ea.installStatus)}">${ea.installStatus === 'installed' ? 'Installed' : 'Scheduled'}</span>
+        ${ea.pendingActivation ? '<span class="badge badge-yellow ml-1">Pending activation</span>' : ''}
+      </td>
+      <td>${ea.representingAckAt ? `<i class="ti ti-check" style="color:var(--success,#34C759)"></i> ${formatDate(ea.representingAckAt)}` : '<span class="text-muted">Not yet</span>'}</td>
+      <td>${ea.feedbackCount}</td>
+      <td>${ea.bugCount}</td>
+      <td>${ea.contactCount}</td>
+      <td>${formatDate(ea.createdAt)}</td>
+    </tr>
+  `;
+}
+
+function showAdminEADetail(id) {
+  showView('admin-ea-detail');
+  renderAdminEADetail(id);
+}
+
+function renderAdminEADetail(id) {
+  const view = document.querySelector('[data-view="admin-ea-detail"]');
+  withLoading(view, () => DB.Admin.earlyAdopter(id), data => {
+    const ea = data.earlyAdopter;
+    view.innerHTML = `
+      <button class="btn btn-secondary btn-sm mb-4" id="admin-back-btn">
+        <i class="ti ti-arrow-left" style="font-size:16px"></i> Back to Early Adopters
+      </button>
+
+      <div class="page-header">
+        <h1 class="h1">${escHtml(ea.name)}</h1>
+        <p class="body admin-page-subtitle">${escHtml(ea.email)}</p>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Profile</p>
+        <div class="admin-kv-grid">
+          <div><p class="field-label">Enrolled</p><p class="body">${formatDate(ea.enrollmentDate)}</p></div>
+          <div><p class="field-label">Referral source</p><p class="body">${escHtml(ea.referralSource) || '—'}</p></div>
+          <div><p class="field-label">Referral code</p><p class="body">${escHtml(ea.referralCode)}</p></div>
+          <div><p class="field-label">Representing HowardAI</p><p class="body">${ea.representingAckAt ? `Acknowledged ${formatDate(ea.representingAckAt)}` : 'Not yet acknowledged'}</p></div>
+          <div><p class="field-label">Account</p><p class="body">${ea.pendingActivation ? 'Awaiting activation' : 'Active'}</p></div>
+        </div>
+        <div class="field mt-4">
+          <label class="field-label">Install status</label>
+          <div class="choice-row" id="admin-status-group">
+            <button type="button" class="choice-chip ${ea.installStatus === 'scheduled' ? 'active' : ''}" data-value="scheduled"><span>Scheduled</span></button>
+            <button type="button" class="choice-chip ${ea.installStatus === 'installed' ? 'active' : ''}" data-value="installed"><span>Installed</span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Feedback (${data.feedback.length})</p>
+        ${data.feedback.length ? data.feedback.map(f => `
+          <div class="admin-record">
+            <div class="admin-record-head">
+              <span class="badge ${importanceBadgeClass(f.importance)}">${findLabel(IMPORTANCE_LEVELS, f.importance)}</span>
+              <span class="text-muted">${findLabel(FEEDBACK_TYPES, f.feedbackType)}</span>
+              <span class="text-muted ml-auto">${formatDate(f.createdAt)}</span>
+            </div>
+            <p class="body">${escHtml(f.message)}</p>
+            ${f.whereEncountered ? `<p class="admin-record-meta">Where: ${escHtml(f.whereEncountered)}</p>` : ''}
+            ${f.additionalNotes ? `<p class="admin-record-meta">${escHtml(f.additionalNotes)}</p>` : ''}
+          </div>
+        `).join('') : '<p class="text-muted">None yet.</p>'}
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Bug Reports (${data.bugs.length})</p>
+        ${data.bugs.length ? data.bugs.map(b => `
+          <div class="admin-record">
+            <div class="admin-record-head">
+              <span class="badge ${severityBadgeClass(b.severity)}">${findLabel(SEVERITIES, b.severity)}</span>
+              <span class="text-muted">${findLabel(ISSUE_TYPES, b.issueType)}</span>
+              <span class="text-muted ml-auto">${formatDate(b.createdAt)}</span>
+            </div>
+            <p class="body admin-record-title">${escHtml(b.title)}</p>
+            <p class="admin-record-meta">${escHtml(b.whatHappened)}</p>
+          </div>
+        `).join('') : '<p class="text-muted">None yet.</p>'}
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Contact Messages (${data.contact.length})</p>
+        ${data.contact.length ? data.contact.map(c => `
+          <div class="admin-record">
+            <div class="admin-record-head"><span class="text-muted ml-auto">${formatDate(c.createdAt)}</span></div>
+            <p class="body">${escHtml(c.message)}</p>
+          </div>
+        `).join('') : '<p class="text-muted">None yet.</p>'}
+      </div>
+    `;
+
+    document.getElementById('admin-back-btn').addEventListener('click', () => showView('admin-eas'));
+    document.getElementById('admin-status-group').querySelectorAll('.choice-chip').forEach(chip => {
+      chip.addEventListener('click', async () => {
+        document.getElementById('admin-status-group').querySelectorAll('.choice-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        try {
+          await DB.Admin.setInstallStatus(id, chip.dataset.value);
+          toast('Install status updated.');
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+    });
+  });
+}
+
+function renderAdminFeedback() {
+  const view = document.querySelector('[data-view="admin-feedback"]');
+  withLoading(view, () => DB.Admin.feedback(), items => {
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Feedback</h1>
+        <p class="body admin-page-subtitle">${items.length} submission${items.length === 1 ? '' : 's'}, most recent first.</p>
+      </div>
+      ${items.length ? items.map(f => `
+        <div class="admin-record admin-record-link" data-ea-id="${f.eaId}">
+          <div class="admin-record-head">
+            <span class="badge ${importanceBadgeClass(f.importance)}">${findLabel(IMPORTANCE_LEVELS, f.importance)}</span>
+            <span class="text-muted">${findLabel(FEEDBACK_TYPES, f.feedbackType)}</span>
+            <span class="text-muted ml-auto">${formatDate(f.createdAt)}</span>
+          </div>
+          <p class="body">${escHtml(f.message)}</p>
+          ${f.whereEncountered ? `<p class="admin-record-meta">Where: ${escHtml(f.whereEncountered)}</p>` : ''}
+          <p class="admin-record-meta">${escHtml(f.eaName)} · ${escHtml(f.eaEmail)}</p>
+        </div>
+      `).join('') : '<p class="text-muted">No feedback yet.</p>'}
+    `;
+    view.querySelectorAll('[data-ea-id]').forEach(el => el.addEventListener('click', () => showAdminEADetail(el.dataset.eaId)));
+  });
+}
+
+function renderAdminBugs() {
+  const view = document.querySelector('[data-view="admin-bugs"]');
+  withLoading(view, () => DB.Admin.bugs(), items => {
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Bug Reports</h1>
+        <p class="body admin-page-subtitle">${items.length} report${items.length === 1 ? '' : 's'}, most recent first.</p>
+      </div>
+      ${items.length ? items.map(b => `
+        <div class="admin-record admin-record-link" data-ea-id="${b.eaId}">
+          <div class="admin-record-head">
+            <span class="badge ${severityBadgeClass(b.severity)}">${findLabel(SEVERITIES, b.severity)}</span>
+            <span class="text-muted">${findLabel(ISSUE_TYPES, b.issueType)}</span>
+            <span class="text-muted ml-auto">${formatDate(b.createdAt)}</span>
+          </div>
+          <p class="body admin-record-title">${escHtml(b.title)}</p>
+          <p class="admin-record-meta">${escHtml(b.whatHappened)}</p>
+          <p class="admin-record-meta">${escHtml(b.eaName)} · ${escHtml(b.eaEmail)}</p>
+        </div>
+      `).join('') : '<p class="text-muted">No bug reports yet.</p>'}
+    `;
+    view.querySelectorAll('[data-ea-id]').forEach(el => el.addEventListener('click', () => showAdminEADetail(el.dataset.eaId)));
+  });
+}
+
+function renderAdminContact() {
+  const view = document.querySelector('[data-view="admin-contact"]');
+  withLoading(view, () => DB.Admin.contact(), items => {
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Messages</h1>
+        <p class="body admin-page-subtitle">${items.length} message${items.length === 1 ? '' : 's'}, most recent first.</p>
+      </div>
+      ${items.length ? items.map(c => `
+        <div class="admin-record admin-record-link" data-ea-id="${c.eaId}">
+          <div class="admin-record-head"><span class="text-muted ml-auto">${formatDate(c.createdAt)}</span></div>
+          <p class="body">${escHtml(c.message)}</p>
+          <p class="admin-record-meta">${escHtml(c.eaName)} · ${escHtml(c.eaEmail)}</p>
+        </div>
+      `).join('') : '<p class="text-muted">No messages yet.</p>'}
+    `;
+    view.querySelectorAll('[data-ea-id]').forEach(el => el.addEventListener('click', () => showAdminEADetail(el.dataset.eaId)));
+  });
+}
+
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
 
 function formatDate(iso) {
@@ -730,13 +1068,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.style.overflow = open ? 'hidden' : '';
   });
 
-  document.getElementById('btn-signout')?.addEventListener('click', async () => {
+  const signOut = async () => {
     closeMobileNav();
     await DB.Auth.logout();
     currentEA = null;
+    document.getElementById('app-shell').classList.remove('is-admin');
     renderLoginView();
     showView('login');
-  });
+  };
+  document.getElementById('btn-signout')?.addEventListener('click', signOut);
+  document.getElementById('btn-signout-admin')?.addEventListener('click', signOut);
 
   init();
 });

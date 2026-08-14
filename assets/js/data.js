@@ -77,6 +77,20 @@ const Contact = {
   send(message) { return api('/contact', { method: 'POST', body: { message } }); }
 };
 
+// ─── ADMIN (read-only over Early Adopter data) ─────────────────────────────
+
+const Admin = {
+  overview() { return api('/admin/overview'); },
+  earlyAdopters() { return api('/admin/early-adopters').then(r => r.earlyAdopters); },
+  earlyAdopter(id) { return api(`/admin/early-adopters/${id}`); },
+  setInstallStatus(id, installStatus) {
+    return api(`/admin/early-adopters/${id}/status`, { method: 'PATCH', body: { installStatus } }).then(r => r.earlyAdopter);
+  },
+  feedback() { return api('/admin/feedback').then(r => r.feedback); },
+  bugs() { return api('/admin/bugs').then(r => r.bugs); },
+  contact() { return api('/admin/contact').then(r => r.contact); }
+};
+
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, Representing, Feedback, Bugs, Contact };
+window.DB = { Auth, Representing, Feedback, Bugs, Contact, Admin };

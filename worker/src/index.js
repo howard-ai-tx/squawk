@@ -1,4 +1,9 @@
-import { json, error, genId, hashPassword, verifyPassword, earlyAdopterToJson, feedbackToJson, bugToJson, contactToJson, corsHeaders } from './util.js';
+import {
+  json, error, genId, hashPassword, verifyPassword, corsHeaders,
+  earlyAdopterToJson, earlyAdopterToAdminJson,
+  feedbackToJson, bugToJson, contactToJson,
+  feedbackToAdminJson, bugToAdminJson, contactToAdminJson
+} from './util.js';
 
 const SESSION_TTL_MS = 86400000; // 24h
 
@@ -84,6 +89,113 @@ export default {
       const auth = await requireAuth(request, env);
       if (!auth) return error('Not authenticated.', 401, origin);
       const { eaRow: me } = auth;
+
+      // ── ADMINISTRATOR PLATFORM (read-only over EA data; view, not create) ──
+      if (path.startsWith('/admin/')) {
+        if (!me.is_admin) return error('Not authorized.', 403, origin);
+        const parts = path.split('/').filter(Boolean); // ['admin', ...]
+
+        if (parts.length === 2 && parts[1] === 'overview' && request.method === 'GET') {
+          const [totals, statusCounts, severityCounts, feedbackImportance, pending, acked] = await Promise.all([
+            db.prepare('SELECT COUNT(*) n FROM early_adopters').first(),
+            db.prepare("SELECT install_status, COUNT(*) n FROM early_adopters GROUP BY install_status").all(),
+            db.prepare('SELECT severity, COUNT(*) n FROM bug_reports GROUP BY severity').all(),
+            db.prepare('SELECT importance, COUNT(*) n FROM feedback GROUP BY importance').all(),
+            db.prepare('SELECT COUNT(*) n FROM early_adopters WHERE activation_token IS NOT NULL AND password_hash IS NULL').first(),
+            db.prepare('SELECT COUNT(*) n FROM early_adopters WHERE representing_ack_at IS NOT NULL').first()
+          ]);
+          const [feedbackTotal, bugTotal, contactTotal] = await Promise.all([
+            db.prepare('SELECT COUNT(*) n FROM feedback').first(),
+            db.prepare('SELECT COUNT(*) n FROM bug_reports').first(),
+            db.prepare('SELECT COUNT(*) n FROM contact_messages').first()
+          ]);
+          const toMap = rows => Object.fromEntries(rows.results.map(r => [r.install_status || r.severity || r.importance, r.n]));
+          return json({
+            totalEarlyAdopters: totals.n,
+            pendingActivation: pending.n,
+            representingAcknowledged: acked.n,
+            installStatusCounts: toMap(statusCounts),
+            bugSeverityCounts: toMap(severityCounts),
+            feedbackImportanceCounts: toMap(feedbackImportance),
+            feedbackTotal: feedbackTotal.n,
+            bugTotal: bugTotal.n,
+            contactTotal: contactTotal.n
+          }, 200, origin);
+        }
+
+        if (parts.length === 2 && parts[1] === 'early-adopters' && request.method === 'GET') {
+          const rows = await db.prepare(`
+            SELECT ea.*,
+              (SELECT COUNT(*) FROM feedback f WHERE f.ea_id = ea.id) feedback_count,
+              (SELECT COUNT(*) FROM bug_reports b WHERE b.ea_id = ea.id) bug_count,
+              (SELECT COUNT(*) FROM contact_messages c WHERE c.ea_id = ea.id) contact_count
+            FROM early_adopters ea
+            ORDER BY ea.created_at DESC
+          `).all();
+          return json({ earlyAdopters: rows.results.map(earlyAdopterToAdminJson) }, 200, origin);
+        }
+
+        if (parts.length === 3 && parts[1] === 'early-adopters' && request.method === 'GET') {
+          const eaId = parts[2];
+          const row = await db.prepare(`
+            SELECT ea.*,
+              (SELECT COUNT(*) FROM feedback f WHERE f.ea_id = ea.id) feedback_count,
+              (SELECT COUNT(*) FROM bug_reports b WHERE b.ea_id = ea.id) bug_count,
+              (SELECT COUNT(*) FROM contact_messages c WHERE c.ea_id = ea.id) contact_count
+            FROM early_adopters ea WHERE ea.id = ?
+          `).bind(eaId).first();
+          if (!row) return error('Early Adopter not found.', 404, origin);
+          const [feedbackRows, bugRows, contactRows] = await Promise.all([
+            db.prepare('SELECT * FROM feedback WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all(),
+            db.prepare('SELECT * FROM bug_reports WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all(),
+            db.prepare('SELECT * FROM contact_messages WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all()
+          ]);
+          return json({
+            earlyAdopter: earlyAdopterToAdminJson(row),
+            feedback: feedbackRows.results.map(feedbackToJson),
+            bugs: bugRows.results.map(bugToJson),
+            contact: contactRows.results.map(contactToJson)
+          }, 200, origin);
+        }
+
+        if (parts.length === 4 && parts[1] === 'early-adopters' && parts[3] === 'status' && request.method === 'PATCH') {
+          const eaId = parts[2];
+          const { installStatus } = await request.json();
+          if (!['scheduled', 'installed'].includes(installStatus)) {
+            return error('installStatus must be "scheduled" or "installed".', 400, origin);
+          }
+          await db.prepare('UPDATE early_adopters SET install_status = ? WHERE id = ?').bind(installStatus, eaId).run();
+          const row = await db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(eaId).first();
+          if (!row) return error('Early Adopter not found.', 404, origin);
+          return json({ earlyAdopter: earlyAdopterToAdminJson(row) }, 200, origin);
+        }
+
+        if (parts.length === 2 && parts[1] === 'feedback' && request.method === 'GET') {
+          const rows = await db.prepare(`
+            SELECT f.*, ea.name ea_name, ea.email ea_email FROM feedback f
+            JOIN early_adopters ea ON ea.id = f.ea_id ORDER BY f.created_at DESC
+          `).all();
+          return json({ feedback: rows.results.map(feedbackToAdminJson) }, 200, origin);
+        }
+
+        if (parts.length === 2 && parts[1] === 'bugs' && request.method === 'GET') {
+          const rows = await db.prepare(`
+            SELECT b.*, ea.name ea_name, ea.email ea_email FROM bug_reports b
+            JOIN early_adopters ea ON ea.id = b.ea_id ORDER BY b.created_at DESC
+          `).all();
+          return json({ bugs: rows.results.map(bugToAdminJson) }, 200, origin);
+        }
+
+        if (parts.length === 2 && parts[1] === 'contact' && request.method === 'GET') {
+          const rows = await db.prepare(`
+            SELECT c.*, ea.name ea_name, ea.email ea_email FROM contact_messages c
+            JOIN early_adopters ea ON ea.id = c.ea_id ORDER BY c.created_at DESC
+          `).all();
+          return json({ contact: rows.results.map(contactToAdminJson) }, 200, origin);
+        }
+
+        return error('Not found.', 404, origin);
+      }
 
       // ── REPRESENTING HOWARDAI ACKNOWLEDGMENT ─────────────────────────────
       if (path === '/representing/ack' && request.method === 'POST') {
