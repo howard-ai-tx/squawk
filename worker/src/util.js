@@ -82,7 +82,17 @@ export function feedbackToJson(row) {
 }
 
 export function bugToJson(row) {
-  return { id: row.id, whatHappened: row.what_happened, expected: row.expected, urgency: row.urgency, createdAt: row.created_at };
+  return {
+    id: row.id, title: row.title, issueType: row.issue_type, severity: row.severity,
+    whatHappened: row.what_happened, stepsToReproduce: row.steps_to_reproduce,
+    expected: row.expected, actual: row.actual,
+    environment: { browser: row.env_browser, os: row.env_os, device: row.env_device, screen: row.env_screen },
+    attachment: row.attachment_json ? JSON.parse(row.attachment_json) : null,
+    frequency: row.frequency, canReproduce: row.can_reproduce, diagnostics: row.diagnostics,
+    testerContext: row.tester_context, regression: row.regression,
+    blockingFeature: row.blocking_feature, followUpOk: row.follow_up_ok,
+    createdAt: row.created_at
+  };
 }
 
 export function contactToJson(row) {

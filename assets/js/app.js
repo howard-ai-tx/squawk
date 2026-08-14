@@ -23,7 +23,6 @@ function showView(name) {
   });
 
   if (name === 'home')          renderHome();
-  if (name === 'status')        renderStatus();
   if (name === 'feedback')      renderFeedback();
   if (name === 'bug')           renderBug();
   if (name === 'contact')       renderContact();
@@ -34,11 +33,12 @@ function showView(name) {
 // ─── TOAST ───────────────────────────────────────────────────────────────────
 
 function toast(message, type = 'success') {
+  const icons  = { success: 'ti-circle-check', error: 'ti-circle-x' };
   const colors = { success: '#34C759', error: '#FF3B30' };
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = 'toast';
-  el.innerHTML = `<i class="ti ti-circle-check" style="color:${colors[type] || colors.success};flex-shrink:0"></i><span>${message}</span>`;
+  el.innerHTML = `<i class="ti ${icons[type] || icons.success}" style="color:${colors[type] || colors.success};flex-shrink:0;font-size:18px"></i><span>${message}</span>`;
   container.appendChild(el);
   setTimeout(() => {
     el.classList.add('out');
@@ -70,6 +70,16 @@ async function init() {
   }
 }
 
+function wirePasswordToggle(inputId, btnId) {
+  const input = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  btn.addEventListener('click', () => {
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.innerHTML = `<i class="ti ${showing ? 'ti-eye' : 'ti-eye-off'}" style="font-size:18px"></i>`;
+  });
+}
+
 function renderActivateView(token, name) {
   const view = document.querySelector('[data-view="activate"]');
   view.innerHTML = `
@@ -81,7 +91,12 @@ function renderActivateView(token, name) {
         <form class="login-form" id="activate-form" novalidate>
           <div class="field">
             <label class="field-label" for="activate-password">Password</label>
-            <input class="input" type="password" id="activate-password" autocomplete="new-password" required>
+            <div class="input-group">
+              <input class="input" type="password" id="activate-password" autocomplete="new-password" required>
+              <button type="button" class="input-icon-btn" id="activate-toggle" aria-label="Show password">
+                <i class="ti ti-eye" style="font-size:18px"></i>
+              </button>
+            </div>
             <p class="field-helper">At least 8 characters.</p>
           </div>
           <div id="activate-error" class="field-error hidden">
@@ -93,6 +108,8 @@ function renderActivateView(token, name) {
       </div>
     </div>
   `;
+
+  wirePasswordToggle('activate-password', 'activate-toggle');
 
   document.getElementById('activate-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -127,16 +144,21 @@ function renderLoginView() {
     <div class="login-page">
       <div class="login-card">
         <img class="login-logo" src="logo-dark.png" alt="Howard AI">
-        <h1 class="login-title">Early Adopters</h1>
-        <p class="login-subtitle">Sign in to your account.</p>
+        <h1 class="login-title">Sign In</h1>
+        <p class="login-subtitle">Welcome back to the Early Adopter Platform.</p>
         <form class="login-form" id="login-form" novalidate>
           <div class="field">
-            <label class="field-label" for="login-email">Email address</label>
+            <label class="field-label" for="login-email">Email</label>
             <input class="input" type="email" id="login-email" autocomplete="email" required>
           </div>
           <div class="field">
             <label class="field-label" for="login-password">Password</label>
-            <input class="input" type="password" id="login-password" autocomplete="current-password" required>
+            <div class="input-group">
+              <input class="input" type="password" id="login-password" autocomplete="current-password" required>
+              <button type="button" class="input-icon-btn" id="login-toggle" aria-label="Show password">
+                <i class="ti ti-eye" style="font-size:18px"></i>
+              </button>
+            </div>
           </div>
           <div id="login-error" class="field-error hidden">
             <i class="ti ti-alert-circle" style="font-size:16px"></i>
@@ -147,6 +169,8 @@ function renderLoginView() {
       </div>
     </div>
   `;
+
+  wirePasswordToggle('login-password', 'login-toggle');
 
   document.getElementById('login-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -177,23 +201,16 @@ function renderHome() {
   const view = document.querySelector('[data-view="home"]');
   const label = currentEA.installStatus === 'installed' ? 'Installed' : 'Scheduled';
   view.innerHTML = `
-    <h1 class="h1 mb-6">${escHtml(currentEA.name.split(' ')[0])}</h1>
-    <span class="status-pill ${currentEA.installStatus === 'installed' ? 'is-installed' : 'is-scheduled'}">
-      <span class="status-dot"></span> Install status: ${label}
-    </span>
-  `;
-}
-
-// ─── STATUS ───────────────────────────────────────────────────────────────────
-
-function renderStatus() {
-  const view = document.querySelector('[data-view="status"]');
-  const isInstalled = currentEA.installStatus === 'installed';
-  view.innerHTML = `
-    <h1 class="h1 mb-6">Status</h1>
-    <span class="status-pill ${isInstalled ? 'is-installed' : 'is-scheduled'}" style="font-size:16px;padding:10px 20px">
-      <span class="status-dot"></span> ${isInstalled ? 'Installed' : 'Scheduled'}
-    </span>
+    <div class="page-header">
+      <p class="page-eyebrow">Welcome back</p>
+      <h1 class="h1">${escHtml(currentEA.name.split(' ')[0])}</h1>
+    </div>
+    <div class="card">
+      <p class="field-label mb-2">Install status</p>
+      <span class="status-pill ${currentEA.installStatus === 'installed' ? 'is-installed' : 'is-scheduled'}">
+        <span class="status-dot"></span> ${label}
+      </span>
+    </div>
   `;
 }
 
@@ -202,11 +219,15 @@ function renderStatus() {
 function renderFeedback() {
   const view = document.querySelector('[data-view="feedback"]');
   view.innerHTML = `
-    <h1 class="h1 mb-6">Submit Feedback</h1>
+    <div class="page-header">
+      <h1 class="h1">Submit Feedback</h1>
+    </div>
     <form id="feedback-form" novalidate>
-      <div class="field mb-6">
-        <label class="field-label" for="feedback-message">Your feedback</label>
-        <textarea class="input" id="feedback-message" placeholder="Share anything — a request, a reaction, a thought."></textarea>
+      <div class="form-section">
+        <div class="field">
+          <label class="field-label" for="feedback-message">Your feedback</label>
+          <textarea class="input" id="feedback-message" placeholder="Share anything — a request, a reaction, a thought."></textarea>
+        </div>
       </div>
       <div id="feedback-error" class="field-error hidden mb-4">
         <i class="ti ti-alert-circle" style="font-size:16px"></i>
@@ -243,62 +264,272 @@ function renderFeedback() {
 
 // ─── REPORT A BUG ─────────────────────────────────────────────────────────────
 
+const ISSUE_TYPES = [
+  { value: 'hardware',    emoji: '🔧', label: 'Hardware', hint: 'Your Howard Core unit' },
+  { value: 'software',    emoji: '💻', label: 'Software',  hint: 'Arken behaving unexpectedly' },
+  { value: 'usability',   emoji: '🎨', label: 'Usability', hint: 'Confusing or hard to use' },
+  { value: 'performance', emoji: '⚡', label: 'Performance', hint: 'Slow or laggy' },
+  { value: 'feature',     emoji: '💡', label: 'Feature request', hint: 'Something you wish it could do' },
+  { value: 'security',    emoji: '🔒', label: 'Security / Privacy', hint: 'A security or privacy concern' },
+  { value: 'other',       emoji: '❓', label: 'Other / Question', hint: '' }
+];
+
+const SEVERITIES = [
+  { value: 'blocking', label: 'Blocking' },
+  { value: 'high',     label: 'High' },
+  { value: 'medium',   label: 'Medium' },
+  { value: 'low',      label: 'Low' }
+];
+
+const FREQUENCIES = [
+  { value: 'once',        label: 'Happened once' },
+  { value: 'occasionally', label: 'Occasionally' },
+  { value: 'always',      label: 'Every time' }
+];
+
+const YES_NO_UNSURE = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+  { value: 'not_sure', label: 'Not sure' }
+];
+
+const YES_NO = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' }
+];
+
+let bugState = {};
+let bugAttachment = null;
+
+function captureEnvironment() {
+  const ua = navigator.userAgent;
+  let browser = 'Unknown browser';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+
+  let os = 'Unknown OS';
+  if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+  else if (/Mac OS X/.test(ua)) os = 'macOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Linux/.test(ua)) os = 'Linux';
+
+  const device = /iPhone|Android.*Mobile/.test(ua) ? 'Mobile' : (/iPad|Tablet|Android(?!.*Mobile)/.test(ua) ? 'Tablet' : 'Desktop');
+  const screen = `${window.screen.width}×${window.screen.height}`;
+
+  return { browser, os, device, screen };
+}
+
+function choiceGroupHtml(id, options, { emoji = false, grid = false } = {}) {
+  const cls = grid ? 'choice-grid' : 'choice-row';
+  return `
+    <div class="${cls}" id="${id}">
+      ${options.map(o => `
+        <button type="button" class="choice-chip" data-value="${o.value}">
+          ${emoji ? `<span class="choice-chip-emoji">${o.emoji}</span>` : ''}
+          <span>${escHtml(o.label)}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function wireChoiceGroup(id, stateKey) {
+  document.getElementById(id).querySelectorAll('.choice-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.getElementById(id).querySelectorAll('.choice-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      bugState[stateKey] = chip.dataset.value;
+    });
+  });
+}
+
 function renderBug() {
+  bugState = {};
+  bugAttachment = null;
+  const env = captureEnvironment();
   const view = document.querySelector('[data-view="bug"]');
+
   view.innerHTML = `
-    <h1 class="h1 mb-6">Report a Bug</h1>
+    <div class="page-header">
+      <h1 class="h1">Report a Bug</h1>
+    </div>
     <form id="bug-form" novalidate>
-      <div class="field mb-4">
-        <label class="field-label" for="bug-happened">What happened</label>
-        <textarea class="input" id="bug-happened" style="min-height:100px"></textarea>
-      </div>
-      <div class="field mb-4">
-        <label class="field-label" for="bug-expected">What you expected</label>
-        <textarea class="input" id="bug-expected" style="min-height:100px"></textarea>
-      </div>
-      <div class="field mb-6">
-        <label class="field-label" for="bug-urgency">Urgency</label>
-        <div class="select-wrapper">
-          <select class="input" id="bug-urgency">
-            <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
-            <option value="high">High</option>
-          </select>
-          <span class="select-chevron"><i class="ti ti-chevron-down" style="font-size:20px"></i></span>
+
+      <div class="form-section">
+        <p class="form-section-title">Overview</p>
+        <p class="form-section-subtitle">A short title and where the problem lives.</p>
+        <div class="field mb-4">
+          <label class="field-label" for="bug-title">Issue title <span class="field-required">Required</span></label>
+          <input class="input" type="text" id="bug-title" placeholder="e.g. Arken stops responding after a long pause">
+        </div>
+        <div class="field mb-4">
+          <label class="field-label">Issue type <span class="field-required">Required</span></label>
+          ${choiceGroupHtml('bug-type-group', ISSUE_TYPES, { emoji: true, grid: true })}
+        </div>
+        <div class="field">
+          <label class="field-label">Severity <span class="field-required">Required</span></label>
+          ${choiceGroupHtml('bug-severity-group', SEVERITIES)}
         </div>
       </div>
+
+      <div class="form-section">
+        <p class="form-section-title">What happened</p>
+        <div class="field mb-4">
+          <label class="field-label" for="bug-happened">Describe what went wrong <span class="field-required">Required</span></label>
+          <textarea class="input" id="bug-happened" style="min-height:100px"></textarea>
+        </div>
+        <div class="field mb-4">
+          <label class="field-label" for="bug-steps">Steps to reproduce</label>
+          <textarea class="input" id="bug-steps" placeholder="1. Go to...&#10;2. Click...&#10;3. ..." style="min-height:100px"></textarea>
+        </div>
+        <div class="field mb-4">
+          <label class="field-label" for="bug-expected">What did you expect to happen? <span class="field-required">Required</span></label>
+          <textarea class="input" id="bug-expected" style="min-height:80px"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label" for="bug-actual">What actually happened?</label>
+          <textarea class="input" id="bug-actual" style="min-height:80px"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Environment</p>
+        <p class="form-section-subtitle">Captured automatically.</p>
+        <div class="env-grid">
+          <div class="env-item"><p class="env-item-label">Browser</p><p class="env-item-value">${escHtml(env.browser)}</p></div>
+          <div class="env-item"><p class="env-item-label">Operating system</p><p class="env-item-value">${escHtml(env.os)}</p></div>
+          <div class="env-item"><p class="env-item-label">Device</p><p class="env-item-value">${escHtml(env.device)}</p></div>
+          <div class="env-item"><p class="env-item-label">Screen size</p><p class="env-item-value">${escHtml(env.screen)}</p></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Attachments</p>
+        <p class="form-section-subtitle">A screenshot, recording, or log file. Please don't include passwords or other sensitive information.</p>
+        <div class="file-drop" id="bug-file-drop" tabindex="0" role="button" aria-label="Attach a file">
+          <input type="file" id="bug-file-input" accept="image/*,video/*,.txt,.log">
+          <i class="ti ti-paperclip" style="font-size:22px;color:var(--text-placeholder);margin-bottom:6px"></i>
+          <p class="caption text-placeholder" id="bug-file-status">Click to attach a file</p>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Frequency &amp; reproducibility</p>
+        <div class="field mb-4">
+          <label class="field-label">How often does this happen?</label>
+          ${choiceGroupHtml('bug-frequency-group', FREQUENCIES)}
+        </div>
+        <div class="field">
+          <label class="field-label">Can you reproduce it?</label>
+          ${choiceGroupHtml('bug-reproduce-group', YES_NO_UNSURE)}
+        </div>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">Diagnostic information</p>
+        <p class="form-section-subtitle">Optional — console output, an error message, a request ID, a timestamp.</p>
+        <textarea class="input" id="bug-diagnostics" style="min-height:80px;font-family:ui-monospace,monospace;font-size:13.5px"></textarea>
+      </div>
+
+      <div class="form-section">
+        <p class="form-section-title">About your testing</p>
+        <div class="field mb-4">
+          <label class="field-label" for="bug-context">What were you trying to accomplish?</label>
+          <textarea class="input" id="bug-context" style="min-height:70px"></textarea>
+        </div>
+        <div class="field mb-4">
+          <label class="field-label">Did this work correctly in an earlier version?</label>
+          ${choiceGroupHtml('bug-regression-group', YES_NO_UNSURE)}
+        </div>
+        <div class="field mb-4">
+          <label class="field-label">Is this blocking you from testing a specific feature?</label>
+          ${choiceGroupHtml('bug-blocking-group', YES_NO)}
+        </div>
+        <div class="field">
+          <label class="field-label">Would you be willing to answer questions about this report?</label>
+          ${choiceGroupHtml('bug-followup-group', YES_NO)}
+        </div>
+      </div>
+
       <div id="bug-error" class="field-error hidden mb-4">
         <i class="ti ti-alert-circle" style="font-size:16px"></i>
         <span id="bug-error-text"></span>
       </div>
-      <button type="submit" class="btn btn-primary" id="bug-btn">Submit</button>
+      <button type="submit" class="btn btn-primary" id="bug-btn">Submit Report</button>
     </form>
   `;
 
+  wireChoiceGroup('bug-type-group', 'issueType');
+  wireChoiceGroup('bug-severity-group', 'severity');
+  wireChoiceGroup('bug-frequency-group', 'frequency');
+  wireChoiceGroup('bug-reproduce-group', 'canReproduce');
+  wireChoiceGroup('bug-regression-group', 'regression');
+  wireChoiceGroup('bug-blocking-group', 'blockingFeature');
+  wireChoiceGroup('bug-followup-group', 'followUpOk');
+
+  const fileDrop = document.getElementById('bug-file-drop');
+  const fileInput = document.getElementById('bug-file-input');
+  fileDrop.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast('File must be under 8MB.', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      bugAttachment = { name: file.name, type: file.type, dataUrl: ev.target.result };
+      document.getElementById('bug-file-status').textContent = file.name;
+      fileDrop.classList.add('has-file');
+    };
+    reader.readAsDataURL(file);
+  });
+
   document.getElementById('bug-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const whatHappened = document.getElementById('bug-happened').value.trim();
-    const expected = document.getElementById('bug-expected').value.trim();
-    const urgency = document.getElementById('bug-urgency').value;
     const errEl = document.getElementById('bug-error');
     errEl.classList.add('hidden');
-    if (!whatHappened || !expected) {
-      document.getElementById('bug-error-text').textContent = 'Please fill in both fields.';
+
+    const title = document.getElementById('bug-title').value.trim();
+    const whatHappened = document.getElementById('bug-happened').value.trim();
+    const expected = document.getElementById('bug-expected').value.trim();
+
+    if (!title || !bugState.issueType || !bugState.severity || !whatHappened || !expected) {
+      document.getElementById('bug-error-text').textContent = 'Please fill in the title, issue type, severity, what happened, and what you expected.';
       errEl.classList.remove('hidden');
       return;
     }
+
     const btn = document.getElementById('bug-btn');
     btn.disabled = true;
+    btn.textContent = 'Submitting...';
     try {
-      await DB.Bugs.submit({ whatHappened, expected, urgency });
+      await DB.Bugs.submit({
+        title,
+        issueType: bugState.issueType,
+        severity: bugState.severity,
+        whatHappened,
+        stepsToReproduce: document.getElementById('bug-steps').value.trim(),
+        expected,
+        actual: document.getElementById('bug-actual').value.trim(),
+        environment: captureEnvironment(),
+        attachment: bugAttachment,
+        frequency: bugState.frequency || null,
+        canReproduce: bugState.canReproduce || null,
+        diagnostics: document.getElementById('bug-diagnostics').value.trim(),
+        testerContext: document.getElementById('bug-context').value.trim(),
+        regression: bugState.regression || null,
+        blockingFeature: bugState.blockingFeature || null,
+        followUpOk: bugState.followUpOk || null
+      });
       toast('Bug report submitted.');
-      document.getElementById('bug-happened').value = '';
-      document.getElementById('bug-expected').value = '';
+      renderBug();
     } catch (err) {
       document.getElementById('bug-error-text').textContent = err.message;
       errEl.classList.remove('hidden');
-    } finally {
       btn.disabled = false;
+      btn.textContent = 'Submit Report';
     }
   });
 }
@@ -308,12 +539,16 @@ function renderBug() {
 function renderContact() {
   const view = document.querySelector('[data-view="contact"]');
   view.innerHTML = `
-    <h1 class="h1 mb-2">Contact Us</h1>
-    <p class="body text-secondary mb-6">This goes directly to Hendrik and Tucker.</p>
+    <div class="page-header">
+      <h1 class="h1 mb-2">Contact Us</h1>
+      <p class="body text-secondary">This goes directly to Hendrik and Tucker.</p>
+    </div>
     <form id="contact-form" novalidate>
-      <div class="field mb-6">
-        <label class="field-label" for="contact-message">Message</label>
-        <textarea class="input" id="contact-message"></textarea>
+      <div class="form-section">
+        <div class="field">
+          <label class="field-label" for="contact-message">Message</label>
+          <textarea class="input" id="contact-message"></textarea>
+        </div>
       </div>
       <div id="contact-error" class="field-error hidden mb-4">
         <i class="ti ti-alert-circle" style="font-size:16px"></i>
@@ -354,17 +589,21 @@ function renderRepresenting() {
   const view = document.querySelector('[data-view="representing"]');
   const acked = !!currentEA.representingAckAt;
   view.innerHTML = `
-    <h1 class="h1 mb-6">Representing HowardAI</h1>
-    <p class="body mb-6">As an Early Adopter, you may be asked about Howard by people around you. This page outlines what to share and how.</p>
+    <div class="page-header">
+      <h1 class="h1">Representing HowardAI</h1>
+    </div>
+    <div class="form-section">
+      <p class="body mb-6">As an Early Adopter, you may be asked about Howard by people around you. This page outlines what to share and how.</p>
 
-    <h3 class="h3 mb-2">What you may discuss</h3>
-    <p class="body text-secondary mb-6">Howard is a locally hosted AI assistant that operates entirely on dedicated hardware, with no cloud dependency. You may describe your own experience using it — what it handles for you, and that you are among its first users.</p>
+      <h3 class="h3 mb-2">What you may discuss</h3>
+      <p class="body text-secondary mb-6">Howard is a locally hosted AI assistant that operates entirely on dedicated hardware, with no cloud dependency. You may describe your own experience using it — what it handles for you, and that you are among its first users.</p>
 
-    <h3 class="h3 mb-2">What to avoid</h3>
-    <p class="body text-secondary mb-6">Do not speak to anything beyond your own direct experience. Technical specifics, product roadmap, or details you have not personally observed should not be discussed. If a question falls outside what you know, direct the person to howardai.us rather than speculating.</p>
+      <h3 class="h3 mb-2">What to avoid</h3>
+      <p class="body text-secondary mb-6">Do not speak to anything beyond your own direct experience. Technical specifics, product roadmap, or details you have not personally observed should not be discussed. If a question falls outside what you know, direct the person to howardai.us rather than speculating.</p>
 
-    <h3 class="h3 mb-2">Tone</h3>
-    <p class="body text-secondary mb-8">Represent Howard the way it represents itself: plainly, and without embellishment. Understatement carries more weight than enthusiasm.</p>
+      <h3 class="h3 mb-2">Tone</h3>
+      <p class="body text-secondary">Represent Howard the way it represents itself: plainly, and without embellishment. Understatement carries more weight than enthusiasm.</p>
+    </div>
 
     <button class="btn ${acked ? 'btn-secondary' : 'btn-primary'}" id="ack-btn" ${acked ? 'disabled' : ''}>
       ${acked ? `Acknowledged on ${formatDate(currentEA.representingAckAt)}` : "I've read this"}
@@ -386,18 +625,20 @@ function renderRefer() {
   const note = `I've been using Howard — a locally hosted AI assistant that runs entirely on its own hardware, no cloud. I'm one of the first people using it, and thought you might want to take a look: ${link}`;
 
   view.innerHTML = `
-    <h1 class="h1 mb-6">Refer Someone</h1>
+    <div class="page-header">
+      <h1 class="h1">Refer Someone</h1>
+    </div>
 
-    <div class="field mb-6">
-      <label class="field-label mb-2">Your referral link</label>
+    <div class="form-section">
+      <p class="field-label mb-2">Your referral link</p>
       <div class="referral-link-box" id="referral-link">${link}</div>
       <button class="btn btn-secondary btn-sm mt-2" id="copy-link-btn">
         <i class="ti ti-copy" style="font-size:16px"></i> Copy Link
       </button>
     </div>
 
-    <div class="field">
-      <label class="field-label mb-2">A note you can forward</label>
+    <div class="form-section">
+      <p class="field-label mb-2">A note you can forward</p>
       <p class="referral-note">${escHtml(note)}</p>
       <button class="btn btn-secondary btn-sm mt-4" id="copy-note-btn">
         <i class="ti ti-copy" style="font-size:16px"></i> Copy Note

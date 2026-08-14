@@ -23,12 +23,28 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 
 CREATE TABLE IF NOT EXISTS bug_reports (
-  id             TEXT PRIMARY KEY,
-  ea_id          TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,
-  what_happened  TEXT NOT NULL,
-  expected       TEXT NOT NULL,
-  urgency        TEXT NOT NULL, -- 'low' | 'medium' | 'high'
-  created_at     TEXT NOT NULL
+  id                    TEXT PRIMARY KEY,
+  ea_id                 TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,
+  title                 TEXT NOT NULL,
+  issue_type            TEXT NOT NULL,   -- 'hardware'|'software'|'usability'|'performance'|'feature'|'security'|'other'
+  severity              TEXT NOT NULL,   -- 'blocking'|'high'|'medium'|'low'
+  what_happened         TEXT NOT NULL,
+  steps_to_reproduce    TEXT,
+  expected              TEXT NOT NULL,
+  actual                TEXT,
+  env_browser           TEXT,
+  env_os                TEXT,
+  env_device            TEXT,
+  env_screen            TEXT,
+  attachment_json       TEXT,
+  frequency             TEXT,   -- 'once'|'occasionally'|'always'
+  can_reproduce         TEXT,   -- 'yes'|'no'|'not_sure'
+  diagnostics           TEXT,
+  tester_context        TEXT,
+  regression            TEXT,   -- 'yes'|'no'|'not_sure'
+  blocking_feature      TEXT,   -- 'yes'|'no'
+  follow_up_ok          TEXT,   -- 'yes'|'no'
+  created_at            TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS contact_messages (

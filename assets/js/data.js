@@ -68,8 +68,8 @@ const Feedback = {
 };
 
 const Bugs = {
-  submit({ whatHappened, expected, urgency }) {
-    return api('/bugs', { method: 'POST', body: { whatHappened, expected, urgency } });
+  submit(fields) {
+    return api('/bugs', { method: 'POST', body: fields });
   }
 };
 

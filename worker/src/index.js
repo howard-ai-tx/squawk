@@ -105,11 +105,25 @@ export default {
 
       // ── BUG REPORTS ───────────────────────────────────────────────────────
       if (path === '/bugs' && request.method === 'POST') {
-        const { whatHappened, expected, urgency } = await request.json();
-        if (!whatHappened || !expected || !urgency) return error('All fields are required.', 400, origin);
+        const b = await request.json();
+        if (!b.title || !b.issueType || !b.severity || !b.whatHappened || !b.expected) {
+          return error('Title, issue type, severity, what happened, and expected result are required.', 400, origin);
+        }
         const id = genId('bug');
-        await db.prepare('INSERT INTO bug_reports (id, ea_id, what_happened, expected, urgency, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(id, me.id, whatHappened.trim(), expected.trim(), urgency, new Date().toISOString()).run();
+        const env = b.environment || {};
+        await db.prepare(`INSERT INTO bug_reports (
+          id, ea_id, title, issue_type, severity, what_happened, steps_to_reproduce, expected, actual,
+          env_browser, env_os, env_device, env_screen, attachment_json, frequency, can_reproduce, diagnostics,
+          tester_context, regression, blocking_feature, follow_up_ok, created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+          id, me.id, b.title.trim(), b.issueType, b.severity,
+          b.whatHappened.trim(), b.stepsToReproduce?.trim() || null, b.expected.trim(), b.actual?.trim() || null,
+          env.browser || null, env.os || null, env.device || null, env.screen || null,
+          b.attachment ? JSON.stringify(b.attachment) : null,
+          b.frequency || null, b.canReproduce || null, b.diagnostics?.trim() || null,
+          b.testerContext?.trim() || null, b.regression || null, b.blockingFeature || null, b.followUpOk || null,
+          new Date().toISOString()
+        ).run();
         const row = await db.prepare('SELECT * FROM bug_reports WHERE id = ?').bind(id).first();
         return json(bugToJson(row), 200, origin);
       }
