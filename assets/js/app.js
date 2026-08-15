@@ -636,7 +636,6 @@ function renderContact() {
 
 function renderRepresenting() {
   const view = document.querySelector('[data-view="representing"]');
-  const acked = !!currentEA.representingAckAt;
   view.innerHTML = `
     <div class="page-header">
       <h1 class="h1">Representing HowardAI</h1>
@@ -653,17 +652,7 @@ function renderRepresenting() {
       <h3 class="h3 mb-2">Tone</h3>
       <p class="body text-secondary">Represent Howard the way it represents itself: plainly, and without embellishment. Understatement carries more weight than enthusiasm.</p>
     </div>
-
-    <button class="btn ${acked ? 'btn-secondary' : 'btn-primary'}" id="ack-btn" ${acked ? 'disabled' : ''}>
-      ${acked ? `Acknowledged on ${formatDate(currentEA.representingAckAt)}` : "I've read this"}
-    </button>
   `;
-
-  document.getElementById('ack-btn').addEventListener('click', async () => {
-    currentEA = await DB.Representing.acknowledge();
-    toast('Acknowledged.');
-    renderRepresenting();
-  });
 }
 
 // ─── REFER SOMEONE ────────────────────────────────────────────────────────────
@@ -759,10 +748,6 @@ function renderAdminOverview() {
           <p class="stat-label">Awaiting Activation</p>
         </div>
         <div class="stat-card">
-          <p class="stat-value">${o.representingAcknowledged}<span class="stat-value-of"> / ${o.totalEarlyAdopters}</span></p>
-          <p class="stat-label">Acknowledged Representing HowardAI</p>
-        </div>
-        <div class="stat-card">
           <p class="stat-value">${o.feedbackTotal}</p>
           <p class="stat-label">Feedback Submissions</p>
         </div>
@@ -819,7 +804,7 @@ function renderAdminEAs() {
         <table class="admin-table">
           <thead>
             <tr>
-              <th>Name</th><th>Email</th><th>Status</th><th>Representing</th>
+              <th>Name</th><th>Email</th><th>Status</th>
               <th>Feedback</th><th>Bugs</th><th>Messages</th><th>Enrolled</th>
             </tr>
           </thead>
@@ -856,7 +841,6 @@ function adminEaRow(ea) {
         <span class="badge ${statusBadgeClass(ea.installStatus)}">${ea.installStatus === 'installed' ? 'Installed' : 'Scheduled'}</span>
         ${ea.pendingActivation ? '<span class="badge badge-yellow ml-1">Pending activation</span>' : ''}
       </td>
-      <td>${ea.representingAckAt ? `<i class="ti ti-check" style="color:var(--success,#34C759)"></i> ${formatDate(ea.representingAckAt)}` : '<span class="text-muted">Not yet</span>'}</td>
       <td>${ea.feedbackCount}</td>
       <td>${ea.bugCount}</td>
       <td>${ea.contactCount}</td>
@@ -890,7 +874,6 @@ function renderAdminEADetail(id) {
           <div><p class="field-label">Enrolled</p><p class="body">${formatDate(ea.enrollmentDate)}</p></div>
           <div><p class="field-label">Referral source</p><p class="body">${escHtml(ea.referralSource) || '—'}</p></div>
           <div><p class="field-label">Referral code</p><p class="body">${escHtml(ea.referralCode)}</p></div>
-          <div><p class="field-label">Representing HowardAI</p><p class="body">${ea.representingAckAt ? `Acknowledged ${formatDate(ea.representingAckAt)}` : 'Not yet acknowledged'}</p></div>
           <div><p class="field-label">Account</p><p class="body">${ea.pendingActivation ? 'Awaiting activation' : 'Active'}</p></div>
         </div>
         <div class="field mt-4">

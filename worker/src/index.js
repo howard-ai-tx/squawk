@@ -96,13 +96,12 @@ export default {
         const parts = path.split('/').filter(Boolean); // ['admin', ...]
 
         if (parts.length === 2 && parts[1] === 'overview' && request.method === 'GET') {
-          const [totals, statusCounts, severityCounts, feedbackImportance, pending, acked] = await Promise.all([
+          const [totals, statusCounts, severityCounts, feedbackImportance, pending] = await Promise.all([
             db.prepare('SELECT COUNT(*) n FROM early_adopters').first(),
             db.prepare("SELECT install_status, COUNT(*) n FROM early_adopters GROUP BY install_status").all(),
             db.prepare('SELECT severity, COUNT(*) n FROM bug_reports GROUP BY severity').all(),
             db.prepare('SELECT importance, COUNT(*) n FROM feedback GROUP BY importance').all(),
-            db.prepare('SELECT COUNT(*) n FROM early_adopters WHERE activation_token IS NOT NULL AND password_hash IS NULL').first(),
-            db.prepare('SELECT COUNT(*) n FROM early_adopters WHERE representing_ack_at IS NOT NULL').first()
+            db.prepare('SELECT COUNT(*) n FROM early_adopters WHERE activation_token IS NOT NULL AND password_hash IS NULL').first()
           ]);
           const [feedbackTotal, bugTotal, contactTotal] = await Promise.all([
             db.prepare('SELECT COUNT(*) n FROM feedback').first(),
@@ -113,7 +112,6 @@ export default {
           return json({
             totalEarlyAdopters: totals.n,
             pendingActivation: pending.n,
-            representingAcknowledged: acked.n,
             installStatusCounts: toMap(statusCounts),
             bugSeverityCounts: toMap(severityCounts),
             feedbackImportanceCounts: toMap(feedbackImportance),
@@ -195,16 +193,6 @@ export default {
         }
 
         return error('Not found.', 404, origin);
-      }
-
-      // ── REPRESENTING HOWARDAI ACKNOWLEDGMENT ─────────────────────────────
-      if (path === '/representing/ack' && request.method === 'POST') {
-        if (!me.representing_ack_at) {
-          await db.prepare('UPDATE early_adopters SET representing_ack_at = ? WHERE id = ?')
-            .bind(new Date().toISOString(), me.id).run();
-        }
-        const updated = await getEARow(db, me.id);
-        return json({ earlyAdopter: earlyAdopterToJson(updated) }, 200, origin);
       }
 
       // ── FEEDBACK ──────────────────────────────────────────────────────────

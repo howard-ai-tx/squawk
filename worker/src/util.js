@@ -73,7 +73,6 @@ export function earlyAdopterToJson(row) {
     referralSource: row.referral_source,
     referralCode: row.referral_code,
     installStatus: row.install_status,
-    representingAckAt: row.representing_ack_at,
     isAdmin: !!row.is_admin
   };
 }
@@ -89,7 +88,6 @@ export function earlyAdopterToAdminJson(row) {
     referralSource: row.referral_source,
     referralCode: row.referral_code,
     installStatus: row.install_status,
-    representingAckAt: row.representing_ack_at,
     isAdmin: !!row.is_admin,
     pendingActivation: !!row.activation_token && !row.password_hash,
     createdAt: row.created_at,

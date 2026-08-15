@@ -59,10 +59,6 @@ const Auth = {
 
 // ─── ACTIONS ──────────────────────────────────────────────────────────────────
 
-const Representing = {
-  acknowledge() { return api('/representing/ack', { method: 'POST' }).then(r => r.earlyAdopter); }
-};
-
 const Feedback = {
   submit(fields) { return api('/feedback', { method: 'POST', body: fields }); }
 };
@@ -93,4 +89,4 @@ const Admin = {
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, Representing, Feedback, Bugs, Contact, Admin };
+window.DB = { Auth, Feedback, Bugs, Contact, Admin };
