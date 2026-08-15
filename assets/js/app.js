@@ -217,12 +217,19 @@ const HOME_QUICK_LINKS = [
   { target: 'refer',        icon: 'ti-user-plus',     title: 'Refer Someone',        body: 'Share your personal invite link.' }
 ];
 
+function timeOfDayGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function renderHome() {
   const view = document.querySelector('[data-view="home"]');
   const label = currentEA.installStatus === 'installed' ? 'Installed' : 'Scheduled';
   view.innerHTML = `
     <div class="page-header">
-      <p class="page-eyebrow">Welcome back</p>
+      <p class="page-eyebrow">${timeOfDayGreeting()}</p>
       <h1 class="h1">${escHtml(currentEA.name.split(' ')[0])}</h1>
     </div>
 
