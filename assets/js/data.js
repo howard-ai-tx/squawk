@@ -78,7 +78,8 @@ const Settings = {
 const Notifications = {
   list() { return api('/me/notifications'); },
   markRead(id) { return api(`/me/notifications/${id}/read`, { method: 'POST' }); },
-  markAllRead() { return api('/me/notifications/read-all', { method: 'POST' }); }
+  markAllRead() { return api('/me/notifications/read-all', { method: 'POST' }); },
+  clear() { return api('/me/notifications', { method: 'DELETE' }); }
 };
 
 const Feedback = {

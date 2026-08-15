@@ -863,7 +863,7 @@ function chatHeaderHtml(name, subtitle, avatar) {
 function renderContact() {
   const view = document.querySelector('[data-view="contact"]');
   view.innerHTML = `
-    ${chatHeaderHtml('HowardAI Team', 'Hendrik & Tucker')}
+    ${chatHeaderHtml('HowardAI Team', 'Hendrik & Tucker', 'favicon.png')}
     <div class="card chat-card">
       <div class="chat-scroll" id="contact-chat-scroll">
         <div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>
@@ -1190,7 +1190,10 @@ function renderNotifications() {
     view.innerHTML = `
       <div class="page-header" style="display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-4)">
         <h1 class="h1">Notifications</h1>
-        ${notifications.some(n => !n.readAt) ? '<button class="btn btn-secondary btn-sm" id="mark-all-read-btn">Mark all read</button>' : ''}
+        <div style="display:flex;gap:var(--space-2)">
+          ${notifications.some(n => !n.readAt) ? '<button class="btn btn-secondary btn-sm" id="mark-all-read-btn">Mark all read</button>' : ''}
+          ${notifications.length ? '<button class="btn btn-secondary btn-sm" id="clear-notifications-btn">Clear All</button>' : ''}
+        </div>
       </div>
       ${notifications.length ? `
         <div class="form-section">
@@ -1232,6 +1235,19 @@ function renderNotifications() {
         toast(err.message, 'error');
         renderNotifications();
       }
+    });
+
+    document.getElementById('clear-notifications-btn')?.addEventListener('click', () => {
+      showConfirmModal({
+        title: 'Clear all notifications?',
+        body: 'This removes your notification history. This cannot be undone.',
+        confirmLabel: 'Clear All',
+        onConfirm: async () => {
+          await DB.Notifications.clear();
+          setNotifBadgeCount(0);
+          renderNotifications();
+        }
+      });
     });
 
     view.querySelectorAll('.notif-item.unread').forEach(item => {

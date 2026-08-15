@@ -188,6 +188,15 @@ export default {
         return json({ ok: true }, 200, origin);
       }
 
+      if (path === '/me/notifications' && request.method === 'DELETE') {
+        if (me.is_admin) {
+          await db.prepare('DELETE FROM notifications WHERE audience = ? OR ea_id = ?').bind('admin', me.id).run();
+        } else {
+          await db.prepare('DELETE FROM notifications WHERE ea_id = ?').bind(me.id).run();
+        }
+        return json({ ok: true }, 200, origin);
+      }
+
       if (path.startsWith('/me/notifications/') && path.endsWith('/read') && request.method === 'POST') {
         const notifId = path.split('/')[3];
         await db.prepare('UPDATE notifications SET read_at = ? WHERE id = ? AND (ea_id = ? OR audience = ?)')
