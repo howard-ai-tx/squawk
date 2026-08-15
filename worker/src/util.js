@@ -102,7 +102,8 @@ export function earlyAdopterToAdminJson(row) {
     createdAt: row.created_at,
     feedbackCount: row.feedback_count ?? undefined,
     bugCount: row.bug_count ?? undefined,
-    contactCount: row.contact_count ?? undefined
+    messageCount: row.message_count ?? undefined,
+    unreadFromEA: row.unread_from_ea ?? undefined
   };
 }
 
@@ -128,8 +129,11 @@ export function bugToJson(row) {
   };
 }
 
-export function contactToJson(row) {
-  return { id: row.id, message: row.message, createdAt: row.created_at };
+export function messageToJson(row) {
+  return {
+    id: row.id, sender: row.sender, message: row.message,
+    readAt: row.read_at, createdAt: row.created_at
+  };
 }
 
 // ─── ADMIN-FACING VARIANTS (include the submitting EA's identity) ──────────
@@ -140,8 +144,4 @@ export function feedbackToAdminJson(row) {
 
 export function bugToAdminJson(row) {
   return { ...bugToJson(row), eaId: row.ea_id, eaName: row.ea_name, eaEmail: row.ea_email };
-}
-
-export function contactToAdminJson(row) {
-  return { ...contactToJson(row), eaId: row.ea_id, eaName: row.ea_name, eaEmail: row.ea_email };
 }

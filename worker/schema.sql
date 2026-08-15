@@ -54,10 +54,14 @@ CREATE TABLE IF NOT EXISTS bug_reports (
   created_at            TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS contact_messages (
+-- One conversation thread per EA, shared with every admin (there's no
+-- concept of a specific admin "owning" a thread — any admin can reply).
+CREATE TABLE IF NOT EXISTS messages (
   id            TEXT PRIMARY KEY,
   ea_id         TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,
+  sender        TEXT NOT NULL DEFAULT 'ea', -- 'ea' | 'admin'
   message       TEXT NOT NULL,
+  read_at       TEXT,               -- NULL until the other side has viewed it
   created_at    TEXT NOT NULL
 );
 
@@ -81,7 +85,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_feedback_ea ON feedback(ea_id);
 CREATE INDEX IF NOT EXISTS idx_bugs_ea ON bug_reports(ea_id);
-CREATE INDEX IF NOT EXISTS idx_contact_ea ON contact_messages(ea_id);
+CREATE INDEX IF NOT EXISTS idx_messages_ea ON messages(ea_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_ea ON sessions(ea_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_ea ON notifications(ea_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_audience ON notifications(audience);

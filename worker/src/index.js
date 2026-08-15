@@ -1,8 +1,8 @@
 import {
   json, error, genId, hashPassword, verifyPassword, corsHeaders,
   earlyAdopterToJson, earlyAdopterToAdminJson, notificationToJson,
-  feedbackToJson, bugToJson, contactToJson,
-  feedbackToAdminJson, bugToAdminJson, contactToAdminJson
+  feedbackToJson, bugToJson, messageToJson,
+  feedbackToAdminJson, bugToAdminJson
 } from './util.js';
 
 const SESSION_TTL_MS = 86400000; // 24h
@@ -103,15 +103,15 @@ export default {
 
       // ── MY ACTIVITY (Home page summary) ─────────────────────────────────
       if (path === '/me/stats' && request.method === 'GET') {
-        const [feedbackCount, bugCount, contactCount] = await Promise.all([
+        const [feedbackCount, bugCount, messageCount] = await Promise.all([
           db.prepare('SELECT COUNT(*) n FROM feedback WHERE ea_id = ?').bind(me.id).first(),
           db.prepare('SELECT COUNT(*) n FROM bug_reports WHERE ea_id = ?').bind(me.id).first(),
-          db.prepare('SELECT COUNT(*) n FROM contact_messages WHERE ea_id = ?').bind(me.id).first()
+          db.prepare("SELECT COUNT(*) n FROM messages WHERE ea_id = ? AND sender = 'ea'").bind(me.id).first()
         ]);
         return json({
           feedbackCount: feedbackCount.n,
           bugCount: bugCount.n,
-          contactCount: contactCount.n
+          contactCount: messageCount.n
         }, 200, origin);
       }
 
@@ -194,6 +194,30 @@ export default {
         return json({ ok: true }, 200, origin);
       }
 
+      // ── MESSAGES (EA's conversation thread with HowardAI) ────────────────
+      if (path === '/messages' && request.method === 'GET') {
+        const rows = await db.prepare('SELECT * FROM messages WHERE ea_id = ? ORDER BY created_at ASC').bind(me.id).all();
+        await db.prepare("UPDATE messages SET read_at = ? WHERE ea_id = ? AND sender = 'admin' AND read_at IS NULL")
+          .bind(new Date().toISOString(), me.id).run();
+        return json({ messages: rows.results.map(messageToJson) }, 200, origin);
+      }
+
+      if (path === '/messages' && request.method === 'POST') {
+        const { message } = await request.json();
+        if (!message || !message.trim()) return error('Message cannot be empty.', 400, origin);
+        const id = genId('msg');
+        await db.prepare("INSERT INTO messages (id, ea_id, sender, message, created_at) VALUES (?, ?, 'ea', ?, ?)")
+          .bind(id, me.id, message.trim(), new Date().toISOString()).run();
+        const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
+        await notifyAdmins(db, {
+          type: 'contact',
+          title: `New message from ${me.name}`,
+          body: message.trim().slice(0, 140),
+          link: `admin-conversation:${me.id}`
+        });
+        return json(messageToJson(row), 200, origin);
+      }
+
       // ── ADMINISTRATOR PLATFORM (read-only over EA data; view, not create) ──
       if (path.startsWith('/admin/')) {
         if (!me.is_admin) return error('Not authorized.', 403, origin);
@@ -210,7 +234,7 @@ export default {
           const [feedbackTotal, bugTotal, contactTotal] = await Promise.all([
             db.prepare('SELECT COUNT(*) n FROM feedback').first(),
             db.prepare('SELECT COUNT(*) n FROM bug_reports').first(),
-            db.prepare('SELECT COUNT(*) n FROM contact_messages').first()
+            db.prepare("SELECT COUNT(*) n FROM messages WHERE sender = 'ea'").first()
           ]);
           const toMap = rows => Object.fromEntries(rows.results.map(r => [r.install_status || r.severity || r.importance, r.n]));
           return json({
@@ -230,7 +254,7 @@ export default {
             SELECT ea.*,
               (SELECT COUNT(*) FROM feedback f WHERE f.ea_id = ea.id) feedback_count,
               (SELECT COUNT(*) FROM bug_reports b WHERE b.ea_id = ea.id) bug_count,
-              (SELECT COUNT(*) FROM contact_messages c WHERE c.ea_id = ea.id) contact_count
+              (SELECT COUNT(*) FROM messages m WHERE m.ea_id = ea.id AND m.sender = 'ea') message_count
             FROM early_adopters ea
             ORDER BY ea.created_at DESC
           `).all();
@@ -243,20 +267,18 @@ export default {
             SELECT ea.*,
               (SELECT COUNT(*) FROM feedback f WHERE f.ea_id = ea.id) feedback_count,
               (SELECT COUNT(*) FROM bug_reports b WHERE b.ea_id = ea.id) bug_count,
-              (SELECT COUNT(*) FROM contact_messages c WHERE c.ea_id = ea.id) contact_count
+              (SELECT COUNT(*) FROM messages m WHERE m.ea_id = ea.id AND m.sender = 'ea') message_count
             FROM early_adopters ea WHERE ea.id = ?
           `).bind(eaId).first();
           if (!row) return error('Early Adopter not found.', 404, origin);
-          const [feedbackRows, bugRows, contactRows] = await Promise.all([
+          const [feedbackRows, bugRows] = await Promise.all([
             db.prepare('SELECT * FROM feedback WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all(),
-            db.prepare('SELECT * FROM bug_reports WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all(),
-            db.prepare('SELECT * FROM contact_messages WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all()
+            db.prepare('SELECT * FROM bug_reports WHERE ea_id = ? ORDER BY created_at DESC').bind(eaId).all()
           ]);
           return json({
             earlyAdopter: earlyAdopterToAdminJson(row),
             feedback: feedbackRows.results.map(feedbackToJson),
-            bugs: bugRows.results.map(bugToJson),
-            contact: contactRows.results.map(contactToJson)
+            bugs: bugRows.results.map(bugToJson)
           }, 200, origin);
         }
 
@@ -299,12 +321,60 @@ export default {
           return json({ bugs: rows.results.map(bugToAdminJson) }, 200, origin);
         }
 
-        if (parts.length === 2 && parts[1] === 'contact' && request.method === 'GET') {
+        // Conversation list: one row per EA who has ever messaged, most
+        // recently active first, with a preview of the last message and how
+        // many of the EA's messages are still unread by any admin.
+        if (parts.length === 2 && parts[1] === 'conversations' && request.method === 'GET') {
           const rows = await db.prepare(`
-            SELECT c.*, ea.name ea_name, ea.email ea_email FROM contact_messages c
-            JOIN early_adopters ea ON ea.id = c.ea_id ORDER BY c.created_at DESC
+            SELECT ea.id ea_id, ea.name ea_name, ea.email ea_email, ea.avatar ea_avatar,
+              (SELECT message FROM messages m WHERE m.ea_id = ea.id ORDER BY m.created_at DESC LIMIT 1) last_message,
+              (SELECT sender FROM messages m WHERE m.ea_id = ea.id ORDER BY m.created_at DESC LIMIT 1) last_sender,
+              (SELECT created_at FROM messages m WHERE m.ea_id = ea.id ORDER BY m.created_at DESC LIMIT 1) last_at,
+              (SELECT COUNT(*) FROM messages m WHERE m.ea_id = ea.id AND m.sender = 'ea' AND m.read_at IS NULL) unread_count
+            FROM early_adopters ea
+            WHERE EXISTS (SELECT 1 FROM messages m WHERE m.ea_id = ea.id)
+            ORDER BY last_at DESC
           `).all();
-          return json({ contact: rows.results.map(contactToAdminJson) }, 200, origin);
+          return json({
+            conversations: rows.results.map(r => ({
+              eaId: r.ea_id, eaName: r.ea_name, eaEmail: r.ea_email, eaAvatar: r.ea_avatar || null,
+              lastMessage: r.last_message, lastSender: r.last_sender, lastAt: r.last_at, unreadCount: r.unread_count
+            }))
+          }, 200, origin);
+        }
+
+        // Full thread with one EA + mark their messages as read by opening it.
+        if (parts.length === 3 && parts[1] === 'conversations' && request.method === 'GET') {
+          const eaId = parts[2];
+          const eaRow = await getEARow(db, eaId);
+          if (!eaRow) return error('Early Adopter not found.', 404, origin);
+          const rows = await db.prepare('SELECT * FROM messages WHERE ea_id = ? ORDER BY created_at ASC').bind(eaId).all();
+          await db.prepare("UPDATE messages SET read_at = ? WHERE ea_id = ? AND sender = 'ea' AND read_at IS NULL")
+            .bind(new Date().toISOString(), eaId).run();
+          return json({
+            earlyAdopter: { id: eaRow.id, name: eaRow.name, email: eaRow.email, avatar: eaRow.avatar || null },
+            messages: rows.results.map(messageToJson)
+          }, 200, origin);
+        }
+
+        // Admin reply into an EA's thread.
+        if (parts.length === 4 && parts[1] === 'conversations' && parts[3] === 'messages' && request.method === 'POST') {
+          const eaId = parts[2];
+          const eaRow = await getEARow(db, eaId);
+          if (!eaRow) return error('Early Adopter not found.', 404, origin);
+          const { message } = await request.json();
+          if (!message || !message.trim()) return error('Message cannot be empty.', 400, origin);
+          const id = genId('msg');
+          await db.prepare("INSERT INTO messages (id, ea_id, sender, message, created_at) VALUES (?, ?, 'admin', ?, ?)")
+            .bind(id, eaId, message.trim(), new Date().toISOString()).run();
+          const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
+          await notifyEA(db, eaId, {
+            type: 'contact',
+            title: 'New reply from HowardAI',
+            body: message.trim().slice(0, 140),
+            link: 'contact'
+          });
+          return json(messageToJson(row), 200, origin);
         }
 
         return error('Not found.', 404, origin);
@@ -358,23 +428,6 @@ export default {
           link: 'admin-bugs'
         });
         return json(bugToJson(row), 200, origin);
-      }
-
-      // ── CONTACT ───────────────────────────────────────────────────────────
-      if (path === '/contact' && request.method === 'POST') {
-        const { message } = await request.json();
-        if (!message || !message.trim()) return error('Message cannot be empty.', 400, origin);
-        const id = genId('msg');
-        await db.prepare('INSERT INTO contact_messages (id, ea_id, message, created_at) VALUES (?, ?, ?, ?)')
-          .bind(id, me.id, message.trim(), new Date().toISOString()).run();
-        const row = await db.prepare('SELECT * FROM contact_messages WHERE id = ?').bind(id).first();
-        await notifyAdmins(db, {
-          type: 'contact',
-          title: `New message from ${me.name}`,
-          body: message.trim().slice(0, 140),
-          link: 'admin-contact'
-        });
-        return json(contactToJson(row), 200, origin);
       }
 
       return error('Not found.', 404, origin);

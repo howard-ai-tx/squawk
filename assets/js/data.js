@@ -91,11 +91,13 @@ const Bugs = {
   }
 };
 
-const Contact = {
-  send(message) { return api('/contact', { method: 'POST', body: { message } }); }
+// The EA's single conversation thread with HowardAI.
+const Messages = {
+  thread() { return api('/messages').then(r => r.messages); },
+  send(message) { return api('/messages', { method: 'POST', body: { message } }); }
 };
 
-// ─── ADMIN (read-only over Early Adopter data) ─────────────────────────────
+// ─── ADMIN (read-only over Early Adopter data, except conversation replies) ──
 
 const Admin = {
   overview() { return api('/admin/overview'); },
@@ -106,9 +108,11 @@ const Admin = {
   },
   feedback() { return api('/admin/feedback').then(r => r.feedback); },
   bugs() { return api('/admin/bugs').then(r => r.bugs); },
-  contact() { return api('/admin/contact').then(r => r.contact); }
+  conversations() { return api('/admin/conversations').then(r => r.conversations); },
+  conversation(eaId) { return api(`/admin/conversations/${eaId}`); },
+  reply(eaId, message) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message } }); }
 };
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, MyActivity, Profile, Settings, Notifications, Feedback, Bugs, Contact, Admin };
+window.DB = { Auth, MyActivity, Profile, Settings, Notifications, Messages, Feedback, Bugs, Admin };

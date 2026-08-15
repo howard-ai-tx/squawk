@@ -23,7 +23,7 @@ function showView(name) {
   }
 
   document.querySelectorAll('.app-nav-link[data-target]').forEach(a => {
-    a.classList.toggle('active', a.dataset.target === name);
+    a.classList.toggle('active', a.dataset.target === name || (a.dataset.target === 'admin-contact' && name === 'admin-conversation'));
   });
   document.getElementById('resources-trigger')?.classList.toggle('active', name === 'representing' || name === 'refer');
   document.querySelectorAll('.app-avatar-trigger').forEach(t => {
@@ -279,7 +279,7 @@ function renderLoginView() {
 const HOME_QUICK_LINKS = [
   { target: 'feedback',     icon: 'ti-message-2',    title: 'Feedback/Suggestions', body: 'Tell us what to change, add, or keep.' },
   { target: 'bug',          icon: 'ti-bug',           title: 'Report a Bug',         body: "Something not working as it should? Let us know." },
-  { target: 'contact',      icon: 'ti-mail',          title: 'Contact Us',           body: 'Reach Hendrik and Tucker directly.' },
+  { target: 'contact',      icon: 'ti-mail',          title: 'Messages',             body: 'Chat directly with Hendrik and Tucker.' },
   { target: 'representing', icon: 'ti-shield-check',  title: 'Representing HowardAI',body: 'What to share when people ask about Howard.' },
   { target: 'refer',        icon: 'ti-user-plus',     title: 'Refer Someone',        body: 'Share your personal invite link.' }
 ];
@@ -713,51 +713,127 @@ function renderBug() {
   });
 }
 
-// ─── CONTACT US ───────────────────────────────────────────────────────────────
+// ─── MESSAGES (chat) ────────────────────────────────────────────────────────
+// Shared bubble-thread rendering used by both the EA's own conversation and
+// each admin conversation thread. "mineSender" is whichever sender value
+// should render as the blue/right-aligned bubbles for the current viewer.
+
+function formatChatDay(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatChatTime(iso) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function chatBubblesHtml(messages, mineSender) {
+  if (!messages.length) {
+    return `
+      <div class="chat-empty">
+        <i class="ti ti-message-2" style="font-size:48px;color:var(--border-hover)"></i>
+        <h3 class="h3 mt-4 mb-2">No messages yet.</h3>
+        <p class="body text-secondary">Send a message to get the conversation started.</p>
+      </div>
+    `;
+  }
+  let lastDay = null;
+  let html = '';
+  messages.forEach(m => {
+    const day = formatChatDay(m.createdAt);
+    if (day !== lastDay) {
+      html += `<div class="chat-timestamp">${day}</div>`;
+      lastDay = day;
+    }
+    const mine = m.sender === mineSender;
+    html += `
+      <div class="chat-row ${mine ? 'mine' : 'theirs'}">
+        <div class="chat-bubble">${escHtml(m.message)}</div>
+      </div>
+    `;
+  });
+  html += `<div class="chat-timestamp" id="chat-last-timestamp">${formatChatTime(messages[messages.length - 1].createdAt)}</div>`;
+  return html;
+}
+
+function wireChatInput({ formId, textareaId, sendBtnId, scrollId, onSend }) {
+  const form = document.getElementById(formId);
+  const textarea = document.getElementById(textareaId);
+
+  const autoGrow = () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  };
+  textarea.addEventListener('input', autoGrow);
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const message = textarea.value.trim();
+    if (!message) return;
+    const btn = document.getElementById(sendBtnId);
+    btn.disabled = true;
+    textarea.disabled = true;
+    try {
+      await onSend(message);
+      textarea.value = '';
+      autoGrow();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      textarea.disabled = false;
+      textarea.focus();
+    }
+  });
+}
+
+function scrollChatToBottom(scrollId) {
+  const el = document.getElementById(scrollId);
+  if (el) el.scrollTop = el.scrollHeight;
+}
 
 function renderContact() {
   const view = document.querySelector('[data-view="contact"]');
   view.innerHTML = `
     <div class="page-header">
-      <h1 class="h1 mb-2">Contact Us</h1>
-      <p class="body text-secondary">This goes directly to Hendrik and Tucker.</p>
+      <h1 class="h1 mb-2">Messages</h1>
+      <p class="body text-secondary">A direct line to Hendrik and Tucker.</p>
     </div>
-    <form id="contact-form" novalidate>
-      <div class="form-section">
-        <div class="field">
-          <label class="field-label" for="contact-message">Message</label>
-          <textarea class="input" id="contact-message"></textarea>
-        </div>
+    <div class="card chat-card">
+      <div class="chat-scroll" id="contact-chat-scroll">
+        <div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>
       </div>
-      <div id="contact-error" class="field-error hidden mb-4">
-        <i class="ti ti-alert-circle" style="font-size:16px"></i>
-        <span id="contact-error-text"></span>
-      </div>
-      <button type="submit" class="btn btn-primary" id="contact-btn">Send</button>
-    </form>
+      <form id="contact-form" class="chat-input-bar" novalidate>
+        <textarea class="input" id="contact-message" placeholder="Message…" rows="1"></textarea>
+        <button type="submit" class="btn btn-primary chat-send-btn" id="contact-send-btn" aria-label="Send">
+          <i class="ti ti-arrow-up" style="font-size:18px"></i>
+        </button>
+      </form>
+    </div>
   `;
 
-  document.getElementById('contact-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const message = document.getElementById('contact-message').value.trim();
-    const errEl = document.getElementById('contact-error');
-    errEl.classList.add('hidden');
-    if (!message) {
-      document.getElementById('contact-error-text').textContent = 'Please enter a message.';
-      errEl.classList.remove('hidden');
-      return;
-    }
-    const btn = document.getElementById('contact-btn');
-    btn.disabled = true;
-    try {
-      await DB.Contact.send(message);
-      toast('Message sent.');
-      document.getElementById('contact-message').value = '';
-    } catch (err) {
-      document.getElementById('contact-error-text').textContent = err.message;
-      errEl.classList.remove('hidden');
-    } finally {
-      btn.disabled = false;
+  DB.Messages.thread().then(messages => {
+    document.getElementById('contact-chat-scroll').innerHTML = chatBubblesHtml(messages, 'ea');
+    scrollChatToBottom('contact-chat-scroll');
+  }).catch(err => {
+    document.getElementById('contact-chat-scroll').innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
+  });
+
+  wireChatInput({
+    formId: 'contact-form',
+    textareaId: 'contact-message',
+    sendBtnId: 'contact-send-btn',
+    scrollId: 'contact-chat-scroll',
+    onSend: async message => {
+      await DB.Messages.send(message);
+      const messages = await DB.Messages.thread();
+      document.getElementById('contact-chat-scroll').innerHTML = chatBubblesHtml(messages, 'ea');
+      scrollChatToBottom('contact-chat-scroll');
     }
   });
 }
@@ -1117,7 +1193,9 @@ function renderNotifications() {
         } catch (err) {
           toast(err.message, 'error');
         }
-        if (link && document.querySelector(`[data-view="${link}"]`)) {
+        if (link && link.startsWith('admin-conversation:')) {
+          showAdminConversation(link.split(':')[1]);
+        } else if (link && document.querySelector(`[data-view="${link}"]`)) {
           showView(link);
         }
       });
@@ -1259,7 +1337,7 @@ function renderAdminOverview() {
         </div>
         <div class="stat-card">
           <p class="stat-value">${o.contactTotal}</p>
-          <p class="stat-label">Contact Messages</p>
+          <p class="stat-label">Messages</p>
         </div>
       </div>
 
@@ -1345,7 +1423,7 @@ function adminEaRow(ea) {
       </td>
       <td>${ea.feedbackCount}</td>
       <td>${ea.bugCount}</td>
-      <td>${ea.contactCount}</td>
+      <td>${ea.messageCount}</td>
       <td>${formatDate(ea.createdAt)}</td>
     </tr>
   `;
@@ -1419,16 +1497,14 @@ function renderAdminEADetail(id) {
       </div>
 
       <div class="form-section">
-        <p class="form-section-title">Contact Messages (${data.contact.length})</p>
-        ${data.contact.length ? data.contact.map(c => `
-          <div class="admin-record">
-            <div class="admin-record-head"><span class="text-muted ml-auto">${formatDate(c.createdAt)}</span></div>
-            <p class="body">${escHtml(c.message)}</p>
-          </div>
-        `).join('') : '<p class="text-muted">None yet.</p>'}
+        <p class="form-section-title">Messages (${ea.messageCount ?? 0})</p>
+        <button class="btn btn-secondary btn-sm" id="admin-view-conversation-btn">
+          <i class="ti ti-message-2" style="font-size:16px"></i> View Conversation
+        </button>
       </div>
     `;
 
+    document.getElementById('admin-view-conversation-btn').addEventListener('click', () => showAdminConversation(ea.id));
     document.getElementById('admin-back-btn').addEventListener('click', () => showView('admin-eas'));
     document.getElementById('admin-status-group').querySelectorAll('.choice-chip').forEach(chip => {
       chip.addEventListener('click', async () => {
@@ -1497,21 +1573,91 @@ function renderAdminBugs() {
 
 function renderAdminContact() {
   const view = document.querySelector('[data-view="admin-contact"]');
-  withLoading(view, () => DB.Admin.contact(), items => {
+  withLoading(view, () => DB.Admin.conversations(), conversations => {
     view.innerHTML = `
       <div class="page-header">
         <h1 class="h1">Messages</h1>
-        <p class="body admin-page-subtitle">${items.length} message${items.length === 1 ? '' : 's'}, most recent first.</p>
+        <p class="body admin-page-subtitle">${conversations.length} conversation${conversations.length === 1 ? '' : 's'}.</p>
       </div>
-      ${items.length ? items.map(c => `
-        <div class="admin-record admin-record-link" data-ea-id="${c.eaId}">
-          <div class="admin-record-head"><span class="text-muted ml-auto">${formatDate(c.createdAt)}</span></div>
-          <p class="body">${escHtml(c.message)}</p>
-          <p class="admin-record-meta">${escHtml(c.eaName)} · ${escHtml(c.eaEmail)}</p>
+      ${conversations.length ? `
+        <div class="form-section">
+          ${conversations.map(c => `
+            <div class="convo-item ${c.unreadCount ? 'unread' : ''}" data-ea-id="${c.eaId}">
+              <div class="convo-avatar" style="${c.eaAvatar ? `background-image:url(${c.eaAvatar})` : ''}">${c.eaAvatar ? '' : initials(c.eaName)}</div>
+              <div class="convo-preview">
+                <div class="convo-name-row">
+                  <span class="convo-name">${escHtml(c.eaName)}</span>
+                  <span class="convo-time">${formatDate(c.lastAt)}</span>
+                </div>
+                <p class="convo-snippet">${c.lastSender === 'admin' ? 'You: ' : ''}${escHtml(c.lastMessage)}</p>
+              </div>
+              ${c.unreadCount ? `<span class="convo-unread-badge">${c.unreadCount}</span>` : ''}
+            </div>
+          `).join('')}
         </div>
-      `).join('') : '<p class="text-muted">No messages yet.</p>'}
+      ` : `
+        <div class="form-section" style="text-align:center;padding:var(--space-12) var(--space-6)">
+          <i class="ti ti-message-2" style="font-size:48px;color:var(--border-hover)"></i>
+          <h3 class="h3 mt-4 mb-2">No conversations yet.</h3>
+          <p class="body text-secondary">Messages from Early Adopters will show up here.</p>
+        </div>
+      `}
     `;
-    view.querySelectorAll('[data-ea-id]').forEach(el => el.addEventListener('click', () => showAdminEADetail(el.dataset.eaId)));
+    view.querySelectorAll('.convo-item').forEach(el => {
+      el.addEventListener('click', () => showAdminConversation(el.dataset.eaId));
+    });
+  });
+}
+
+function showAdminConversation(eaId) {
+  showView('admin-conversation');
+  renderAdminConversation(eaId);
+}
+
+function renderAdminConversation(eaId) {
+  const view = document.querySelector('[data-view="admin-conversation"]');
+  view.innerHTML = `<div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>`;
+
+  DB.Admin.conversation(eaId).then(({ earlyAdopter, messages }) => {
+    view.innerHTML = `
+      <button class="btn btn-secondary btn-sm mb-4" id="admin-convo-back-btn">
+        <i class="ti ti-arrow-left" style="font-size:16px"></i> Back to Messages
+      </button>
+      <div class="page-header" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-6)">
+        <div class="convo-avatar" style="${earlyAdopter.avatar ? `background-image:url(${earlyAdopter.avatar})` : ''}">${earlyAdopter.avatar ? '' : initials(earlyAdopter.name)}</div>
+        <div>
+          <h1 class="h1" style="font-size:22px">${escHtml(earlyAdopter.name)}</h1>
+          <p class="text-muted">${escHtml(earlyAdopter.email)}</p>
+        </div>
+      </div>
+      <div class="card chat-card">
+        <div class="chat-scroll" id="admin-chat-scroll">${chatBubblesHtml(messages, 'admin')}</div>
+        <form id="admin-reply-form" class="chat-input-bar" novalidate>
+          <textarea class="input" id="admin-reply-message" placeholder="Message…" rows="1"></textarea>
+          <button type="submit" class="btn btn-primary chat-send-btn" id="admin-reply-send-btn" aria-label="Send">
+            <i class="ti ti-arrow-up" style="font-size:18px"></i>
+          </button>
+        </form>
+      </div>
+    `;
+    scrollChatToBottom('admin-chat-scroll');
+
+    document.getElementById('admin-convo-back-btn').addEventListener('click', () => showView('admin-contact'));
+
+    wireChatInput({
+      formId: 'admin-reply-form',
+      textareaId: 'admin-reply-message',
+      sendBtnId: 'admin-reply-send-btn',
+      scrollId: 'admin-chat-scroll',
+      onSend: async message => {
+        await DB.Admin.reply(eaId, message);
+        const { messages } = await DB.Admin.conversation(eaId);
+        document.getElementById('admin-chat-scroll').innerHTML = chatBubblesHtml(messages, 'admin');
+        scrollChatToBottom('admin-chat-scroll');
+      }
+    });
+  }).catch(err => {
+    view.innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
   });
 }
 
