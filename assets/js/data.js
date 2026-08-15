@@ -59,6 +59,10 @@ const Auth = {
 
 // ─── ACTIONS ──────────────────────────────────────────────────────────────────
 
+const MyActivity = {
+  stats() { return api('/me/stats'); }
+};
+
 const Feedback = {
   submit(fields) { return api('/feedback', { method: 'POST', body: fields }); }
 };
@@ -89,4 +93,4 @@ const Admin = {
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, Feedback, Bugs, Contact, Admin };
+window.DB = { Auth, MyActivity, Feedback, Bugs, Contact, Admin };

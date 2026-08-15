@@ -208,6 +208,14 @@ function renderLoginView() {
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
 
+const HOME_QUICK_LINKS = [
+  { target: 'feedback',     icon: 'ti-message-2',    title: 'Feedback/Suggestions', body: 'Tell us what to change, add, or keep.' },
+  { target: 'bug',          icon: 'ti-bug',           title: 'Report a Bug',         body: "Something not working as it should? Let us know." },
+  { target: 'contact',      icon: 'ti-mail',          title: 'Contact Us',           body: 'Reach Hendrik and Tucker directly.' },
+  { target: 'representing', icon: 'ti-shield-check',  title: 'Representing HowardAI',body: 'What to share when people ask about Howard.' },
+  { target: 'refer',        icon: 'ti-user-plus',     title: 'Refer Someone',        body: 'Share your personal invite link.' }
+];
+
 function renderHome() {
   const view = document.querySelector('[data-view="home"]');
   const label = currentEA.installStatus === 'installed' ? 'Installed' : 'Scheduled';
@@ -216,13 +224,60 @@ function renderHome() {
       <p class="page-eyebrow">Welcome back</p>
       <h1 class="h1">${escHtml(currentEA.name.split(' ')[0])}</h1>
     </div>
-    <div class="card">
+
+    <div class="card mb-8">
       <p class="field-label mb-2">Install status</p>
       <span class="status-pill ${currentEA.installStatus === 'installed' ? 'is-installed' : 'is-scheduled'}">
         <span class="status-dot"></span> ${label}
       </span>
     </div>
+
+    <p class="form-section-title">Your activity</p>
+    <div class="stat-grid mb-8" id="home-stats">
+      <div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>
+    </div>
+
+    <p class="form-section-title">Quick links</p>
+    <div class="home-links-grid">
+      ${HOME_QUICK_LINKS.map(l => `
+        <div class="card home-link-card" data-target="${l.target}">
+          <i class="ti ${l.icon}" style="font-size:24px"></i>
+          <h3 class="h3 home-link-title">${escHtml(l.title)}</h3>
+          <p class="body text-secondary">${escHtml(l.body)}</p>
+          <span class="home-link-action">Open <i class="ti ti-arrow-right" style="font-size:14px"></i></span>
+        </div>
+      `).join('')}
+    </div>
   `;
+
+  view.querySelectorAll('.home-link-card').forEach(card => {
+    card.addEventListener('click', () => {
+      showView(card.dataset.target);
+      closeMobileNav();
+    });
+  });
+
+  DB.MyActivity.stats().then(s => {
+    const el = document.getElementById('home-stats');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="stat-card">
+        <p class="stat-value">${s.feedbackCount}</p>
+        <p class="stat-label">Feedback Submitted</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-value">${s.bugCount}</p>
+        <p class="stat-label">Bug Reports</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-value">${s.contactCount}</p>
+        <p class="stat-label">Messages Sent</p>
+      </div>
+    `;
+  }).catch(() => {
+    const el = document.getElementById('home-stats');
+    if (el) el.innerHTML = '';
+  });
 }
 
 // ─── FEEDBACK / SUGGESTIONS ───────────────────────────────────────────────────

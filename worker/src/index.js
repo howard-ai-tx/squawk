@@ -90,6 +90,20 @@ export default {
       if (!auth) return error('Not authenticated.', 401, origin);
       const { eaRow: me } = auth;
 
+      // ── MY ACTIVITY (Home page summary) ─────────────────────────────────
+      if (path === '/me/stats' && request.method === 'GET') {
+        const [feedbackCount, bugCount, contactCount] = await Promise.all([
+          db.prepare('SELECT COUNT(*) n FROM feedback WHERE ea_id = ?').bind(me.id).first(),
+          db.prepare('SELECT COUNT(*) n FROM bug_reports WHERE ea_id = ?').bind(me.id).first(),
+          db.prepare('SELECT COUNT(*) n FROM contact_messages WHERE ea_id = ?').bind(me.id).first()
+        ]);
+        return json({
+          feedbackCount: feedbackCount.n,
+          bugCount: bugCount.n,
+          contactCount: contactCount.n
+        }, 200, origin);
+      }
+
       // ── ADMINISTRATOR PLATFORM (read-only over EA data; view, not create) ──
       if (path.startsWith('/admin/')) {
         if (!me.is_admin) return error('Not authorized.', 403, origin);

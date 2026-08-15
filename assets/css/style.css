@@ -421,6 +421,30 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 
 .form-section-title { font-size: 15px; font-weight: 700; margin-bottom: var(--space-4); }
 
+/* ─── HOME ─────────────────────────────────────────────────────── */
+
+.home-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.home-link-card {
+  cursor: pointer;
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+.home-link-card:hover { border-color: var(--border-hover); }
+.home-link-card i:first-child { color: var(--text-primary); }
+.home-link-title { margin: var(--space-3) 0 var(--space-1); }
+.home-link-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--action);
+}
+
 .divider { border: none; border-top: 1px solid var(--divider); }
 
 /* ─── STATUS PILL ─────────────────────────────────────────────── */
