@@ -370,6 +370,33 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 
 .choice-chip i { flex-shrink: 0; }
 
+/* Bug severity chips: selected color communicates severity per the IDL semantic
+   palette (green/yellow/orange/red), overriding the default blue active state. */
+#bug-severity-group .choice-chip[data-value="low"].active {
+  border-color: #34C759;
+  background: rgba(52,199,89,0.1);
+  color: #1F8A3B;
+  box-shadow: 0 0 0 3px rgba(52,199,89,0.12);
+}
+#bug-severity-group .choice-chip[data-value="medium"].active {
+  border-color: #EBC736;
+  background: rgba(235,199,54,0.18);
+  color: #7A6205;
+  box-shadow: 0 0 0 3px rgba(235,199,54,0.15);
+}
+#bug-severity-group .choice-chip[data-value="high"].active {
+  border-color: #FF9F0A;
+  background: rgba(255,159,10,0.1);
+  color: #B5650A;
+  box-shadow: 0 0 0 3px rgba(255,159,10,0.12);
+}
+#bug-severity-group .choice-chip[data-value="blocking"].active {
+  border-color: #FF3B30;
+  background: rgba(255,59,48,0.08);
+  color: #C0281E;
+  box-shadow: 0 0 0 3px rgba(255,59,48,0.1);
+}
+
 .choice-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .choice-row .choice-chip { flex: 1; min-width: 100px; justify-content: center; text-align: center; }
 
