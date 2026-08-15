@@ -154,6 +154,8 @@ p, .body { font-size: 16px; font-weight: 400; }
 .app-nav-toggle:hover { background: var(--light-bg); }
 .app-nav-toggle:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 
+.app-nav-close { display: none; }
+
 /* ─── NAV DROPDOWN (Resources) ───────────────────────────────────
    Desktop: a floating dark panel per the IDL navigation-dropdown spec.
    Mobile: overridden below to sit inline inside the full-screen menu panel. */
@@ -253,6 +255,28 @@ p, .body { font-size: 16px; font-weight: 400; }
   }
 
   .app-nav-signout { margin-top: auto; }
+
+  /* The nav panel is a full-screen overlay (z-index 200) that sits above the
+     topbar (z-index 100), so the hamburger-to-X toggle button underneath
+     becomes invisible once open — this close button lives inside the panel
+     itself so there's always a visible, reachable way to dismiss it. */
+  .app-nav-close {
+    display: flex;
+    position: absolute;
+    top: calc(var(--space-6) + env(safe-area-inset-top));
+    right: var(--space-6);
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .app-nav-close:hover { background: var(--light-bg); }
+  .app-nav-close:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 
   /* Inside the full-screen mobile panel the dropdown behaves like the IDL's
      details/summary sub-link pattern: it expands inline, not as a floating

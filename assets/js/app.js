@@ -1146,6 +1146,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.style.overflow = open ? 'hidden' : '';
   });
 
+  document.querySelectorAll('.app-nav-close').forEach(btn => {
+    btn.addEventListener('click', closeMobileNav);
+  });
+
   const signOut = async () => {
     closeMobileNav();
     await DB.Auth.logout();
