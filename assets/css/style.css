@@ -202,6 +202,11 @@ p, .body { font-size: 16px; font-weight: 400; }
 .app-nav-dropdown .app-nav-link:hover { background: rgba(255,255,255,0.06); color: var(--action-hover); }
 .app-nav-dropdown .app-nav-link.active { background: rgba(255,255,255,0.08); color: var(--action-hover); font-weight: 700; }
 
+/* Sign Out is a destructive-leaning action — it must stay red even inside
+   the dark dropdown, which otherwise sets every link to a neutral white. */
+.app-nav-dropdown .app-nav-signout { color: var(--error); }
+.app-nav-dropdown .app-nav-signout:hover { color: var(--error-hover); background: rgba(255,59,48,0.12); }
+
 /* ─── ACCOUNT MENU (avatar) ──────────────────────────────────────
    Reuses the .app-nav-dropdown-wrap/.app-nav-dropdown pattern above,
    right-aligned since it's the last item in the nav. */
@@ -380,6 +385,8 @@ p, .body { font-size: 16px; font-weight: 400; }
   }
   .app-nav-dropdown .app-nav-link:hover { background: rgba(0,0,0,0.045); color: var(--text-primary); }
   .app-nav-dropdown .app-nav-link.active { background: rgba(0,0,0,0.06); color: var(--text-primary); }
+  .app-nav-dropdown .app-nav-signout { color: var(--error); }
+  .app-nav-dropdown .app-nav-signout:hover { color: var(--error-hover); background: rgba(255,59,48,0.08); }
 
   /* Account menu becomes a full-width row like every other nav item. */
   .app-avatar-trigger {
@@ -1160,6 +1167,14 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
   display: flex; align-items: center; justify-content: center;
   background: var(--action); color: #fff; font-size: 14px; font-weight: 700;
   background-size: cover; background-position: center;
+}
+/* HowardAI's own brand mark shouldn't fill the circle edge-to-edge like a
+   cropped photo — it sits smaller on the IDL's light grey surface instead. */
+.convo-avatar-brand {
+  background-color: var(--light-bg);
+  background-size: 60%;
+  background-repeat: no-repeat;
+  border: 1px solid var(--border);
 }
 .convo-preview { flex: 1; min-width: 0; }
 .convo-name-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }

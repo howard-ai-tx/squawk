@@ -848,10 +848,11 @@ function chatInputBarHtml(formId, textareaId, sendBtnId, attachBtnId, fileInputI
 
 // Same avatar+name header style used for every conversation thread, so the
 // EA's own thread and an admin's view of it feel like the same product.
-function chatHeaderHtml(name, subtitle, avatar) {
+function chatHeaderHtml(name, subtitle, avatar, brand = false) {
+  const avatarClass = brand ? 'convo-avatar convo-avatar-brand' : 'convo-avatar';
   return `
     <div class="page-header" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-6)">
-      <div class="convo-avatar" style="${avatar ? `background-image:url(${avatar})` : ''}">${avatar ? '' : initials(name)}</div>
+      <div class="${avatarClass}" style="${avatar ? `background-image:url(${avatar})` : ''}">${avatar ? '' : initials(name)}</div>
       <div>
         <h1 class="h1" style="font-size:22px">${escHtml(name)}</h1>
         <p class="text-muted">${escHtml(subtitle)}</p>
@@ -863,7 +864,7 @@ function chatHeaderHtml(name, subtitle, avatar) {
 function renderContact() {
   const view = document.querySelector('[data-view="contact"]');
   view.innerHTML = `
-    ${chatHeaderHtml('HowardAI Team', 'Hendrik & Tucker', 'favicon.png')}
+    ${chatHeaderHtml('HowardAI Team', 'Hendrik & Tucker', 'favicon.png', true)}
     <div class="card chat-card">
       <div class="chat-scroll" id="contact-chat-scroll">
         <div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>
