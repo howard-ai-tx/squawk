@@ -21,6 +21,7 @@ function showView(name) {
   document.querySelectorAll('.app-nav-link[data-target]').forEach(a => {
     a.classList.toggle('active', a.dataset.target === name);
   });
+  document.getElementById('resources-trigger')?.classList.toggle('active', name === 'representing' || name === 'refer');
 
   if (name === 'home')          renderHome();
   if (name === 'feedback')      renderFeedback();
@@ -696,16 +697,26 @@ function renderRepresenting() {
       <h1 class="h1">Representing HowardAI</h1>
     </div>
     <div class="form-section">
-      <p class="body mb-6">As an Early Adopter, you may be asked about Howard by people around you. This page outlines what to share and how.</p>
+      <p class="body mb-6">As an Early Adopter, you may be asked about Howard by people around you. This document outlines what may be shared publicly and how to handle common situations.</p>
 
-      <h3 class="h3 mb-2">What you may discuss</h3>
-      <p class="body text-secondary mb-6">Howard is a locally hosted AI assistant that operates entirely on dedicated hardware, with no cloud dependency. You may describe your own experience using it — what it handles for you, and that you are among its first users.</p>
+      <h3 class="h3 mb-2">General discussion</h3>
+      <p class="body text-secondary mb-4">Howard is a locally hosted AI assistant that operates entirely on dedicated hardware, with no cloud dependency. You may describe your own experience using it — what it handles for you, and that you are among its first users.</p>
+      <p class="body text-secondary mb-6">Discussion should be limited to direct personal experience. Technical specifications, product roadmap, and any details not personally observed should not be shared. Questions outside this scope should be directed to howardai.us.</p>
 
-      <h3 class="h3 mb-2">What to avoid</h3>
-      <p class="body text-secondary mb-6">Do not speak to anything beyond your own direct experience. Technical specifics, product roadmap, or details you have not personally observed should not be discussed. If a question falls outside what you know, direct the person to howardai.us rather than speculating.</p>
+      <h3 class="h3 mb-2">Pricing</h3>
+      <p class="body text-secondary mb-6">Pricing under the Early Adopter Program is individually set and does not reflect standard pricing. Personal pricing should not be disclosed. Pricing questions should be directed to howardai.us or to HowardAI directly.</p>
+
+      <h3 class="h3 mb-2">Demonstrations and media</h3>
+      <p class="body text-secondary mb-6">In-person demonstrations of Howard are permitted. Public posting of photos, video, or screen recordings — including social media, forums, or group messaging intended for wide circulation — is not permitted while HowardAI remains pre-launch.</p>
+
+      <h3 class="h3 mb-2">Referrals</h3>
+      <p class="body text-secondary mb-6">Interested parties may be directed to howardai.us, or their information may be passed to HowardAI directly for follow-up.</p>
+
+      <h3 class="h3 mb-2">Press and public inquiries</h3>
+      <p class="body text-secondary mb-6">Early Adopters do not speak on behalf of HowardAI in any public or published capacity. Media, blogger, or public-account inquiries should be forwarded to HowardAI directly.</p>
 
       <h3 class="h3 mb-2">Tone</h3>
-      <p class="body text-secondary">Represent Howard the way it represents itself: plainly, and without embellishment. Understatement carries more weight than enthusiasm.</p>
+      <p class="body text-secondary">Howard is represented plainly and without embellishment, consistent with the brand it represents.</p>
     </div>
   `;
 }
@@ -1087,6 +1098,14 @@ function closeMobileNav() {
   toggle.innerHTML = '<i class="ti ti-menu-2" style="font-size:20px"></i>';
   toggle.setAttribute('aria-expanded', 'false');
   document.body.style.overflow = '';
+  closeResourcesDropdown();
+}
+
+function closeResourcesDropdown() {
+  const wrap = document.getElementById('resources-dropdown-wrap');
+  if (!wrap) return;
+  wrap.classList.remove('open');
+  document.getElementById('resources-trigger')?.setAttribute('aria-expanded', 'false');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1095,6 +1114,20 @@ document.addEventListener('DOMContentLoaded', () => {
       showView(btn.dataset.target);
       closeMobileNav();
     });
+  });
+
+  document.getElementById('resources-trigger')?.addEventListener('click', e => {
+    e.stopPropagation();
+    const wrap = document.getElementById('resources-dropdown-wrap');
+    const open = wrap.classList.toggle('open');
+    document.getElementById('resources-trigger').setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('resources-dropdown-wrap');
+    if (wrap && wrap.classList.contains('open') && !wrap.contains(e.target)) closeResourcesDropdown();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeResourcesDropdown();
   });
 
   document.getElementById('app-nav-toggle')?.addEventListener('click', () => {

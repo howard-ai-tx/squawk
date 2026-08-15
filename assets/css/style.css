@@ -154,6 +154,52 @@ p, .body { font-size: 16px; font-weight: 400; }
 .app-nav-toggle:hover { background: var(--light-bg); }
 .app-nav-toggle:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 
+/* ─── NAV DROPDOWN (Resources) ───────────────────────────────────
+   Desktop: a floating dark panel per the IDL navigation-dropdown spec.
+   Mobile: overridden below to sit inline inside the full-screen menu panel. */
+.app-nav-dropdown-wrap { position: relative; }
+
+.app-nav-dropdown-trigger i { transition: transform var(--dur-instant) var(--ease-out); }
+.app-nav-dropdown-wrap.open .app-nav-dropdown-trigger i { transform: rotate(180deg); }
+.app-nav-dropdown-wrap.open .app-nav-dropdown-trigger { color: var(--text-primary); background: rgba(0,0,0,0.045); }
+
+.app-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 210px;
+  background: rgba(17,17,17,0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out), visibility 0s linear var(--dur-short);
+  z-index: 50;
+}
+
+.app-nav-dropdown-wrap.open .app-nav-dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
+}
+
+.app-nav-dropdown .app-nav-link {
+  color: rgba(255,255,255,0.85);
+  justify-content: flex-start;
+  border-radius: var(--radius-md);
+}
+.app-nav-dropdown .app-nav-link:hover { background: rgba(255,255,255,0.06); color: var(--action-hover); }
+.app-nav-dropdown .app-nav-link.active { background: rgba(255,255,255,0.08); color: var(--action-hover); font-weight: 700; }
+
 /* Mobile navigation is a full-screen panel, not a dropdown, per the IDL's
    mobile navigation spec. */
 @media (max-width: 860px) {
@@ -207,6 +253,36 @@ p, .body { font-size: 16px; font-weight: 400; }
   }
 
   .app-nav-signout { margin-top: auto; }
+
+  /* Inside the full-screen mobile panel the dropdown behaves like the IDL's
+     details/summary sub-link pattern: it expands inline, not as a floating
+     dark panel (there's no page content behind it to float over). */
+  .app-nav-dropdown-wrap { position: static; }
+  .app-nav-dropdown {
+    position: static;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    padding: 0 0 0 var(--space-4);
+    max-height: 0;
+    overflow: hidden;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition: max-height var(--dur-short) var(--ease-out);
+  }
+  .app-nav-dropdown-wrap.open .app-nav-dropdown {
+    max-height: 200px;
+    transition: max-height var(--dur-short) var(--ease-out);
+  }
+  .app-nav-dropdown .app-nav-link {
+    color: var(--text-secondary);
+    font-size: 17px;
+  }
+  .app-nav-dropdown .app-nav-link:hover { background: rgba(0,0,0,0.045); color: var(--text-primary); }
+  .app-nav-dropdown .app-nav-link.active { background: rgba(0,0,0,0.06); color: var(--text-primary); }
 }
 
 .app-main {
