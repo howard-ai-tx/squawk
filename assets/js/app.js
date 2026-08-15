@@ -113,14 +113,24 @@ async function refreshNotifBadge() {
   if (!currentEA) return;
   try {
     const { unreadCount } = await DB.Notifications.list();
-    document.querySelectorAll('.app-notif-badge').forEach(el => {
-      el.textContent = String(unreadCount);
-      el.classList.toggle('hidden', unreadCount === 0);
-    });
-    document.querySelectorAll('.app-avatar-notif-dot').forEach(el => {
-      el.classList.toggle('hidden', unreadCount === 0);
-    });
+    setNotifBadgeCount(unreadCount);
   } catch { /* best effort */ }
+}
+
+function setNotifBadgeCount(unreadCount) {
+  document.querySelectorAll('.app-notif-badge').forEach(el => {
+    el.textContent = String(unreadCount);
+    el.classList.toggle('hidden', unreadCount === 0);
+  });
+  document.querySelectorAll('.app-avatar-notif-dot').forEach(el => {
+    el.classList.toggle('hidden', unreadCount === 0);
+  });
+}
+
+function currentNotifBadgeCount() {
+  const el = document.querySelector('.app-notif-badge');
+  const n = el ? parseInt(el.textContent, 10) : NaN;
+  return Number.isFinite(n) ? n : 0;
 }
 
 function wirePasswordToggle(inputId, btnId) {
@@ -1061,21 +1071,40 @@ function renderNotifications() {
       `}
     `;
 
-    document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
-      await DB.Notifications.markAllRead();
-      refreshNotifBadge();
-      renderNotifications();
+    document.getElementById('mark-all-read-btn')?.addEventListener('click', async function() {
+      // Optimistic: reflect "all read" immediately rather than waiting on a
+      // re-fetch, since D1 reads can briefly lag just-committed writes.
+      this.remove();
+      view.querySelectorAll('.notif-item.unread').forEach(item => {
+        item.classList.remove('unread');
+        item.querySelector('.notif-dot-inline')?.remove();
+      });
+      setNotifBadgeCount(0);
+      try {
+        await DB.Notifications.markAllRead();
+      } catch (err) {
+        toast(err.message, 'error');
+        renderNotifications();
+      }
     });
 
     view.querySelectorAll('.notif-item.unread').forEach(item => {
       item.addEventListener('click', async () => {
-        await DB.Notifications.markRead(item.dataset.id);
-        refreshNotifBadge();
+        // Optimistic: update this item and the badge immediately so it
+        // visibly "goes away" the instant you click, before the API call
+        // (and any D1 read-after-write lag) resolves.
+        item.classList.remove('unread');
+        item.querySelector('.notif-dot-inline')?.remove();
+        setNotifBadgeCount(Math.max(0, currentNotifBadgeCount() - 1));
+
         const link = item.dataset.link;
+        try {
+          await DB.Notifications.markRead(item.dataset.id);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
         if (link && document.querySelector(`[data-view="${link}"]`)) {
           showView(link);
-        } else {
-          renderNotifications();
         }
       });
     });

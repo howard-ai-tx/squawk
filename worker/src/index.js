@@ -17,6 +17,11 @@ async function notifyAdmins(db, { type, title, body, link }) {
     .bind(genId('note'), 'admin', type, title, body || null, link || null, new Date().toISOString()).run();
 }
 
+async function notifyEA(db, eaId, { type, title, body, link }) {
+  await db.prepare('INSERT INTO notifications (id, ea_id, type, title, body, link, created_at) VALUES (?,?,?,?,?,?,?)')
+    .bind(genId('note'), eaId, type, title, body || null, link || null, new Date().toISOString()).run();
+}
+
 async function requireAuth(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -261,9 +266,20 @@ export default {
           if (!['scheduled', 'installed'].includes(installStatus)) {
             return error('installStatus must be "scheduled" or "installed".', 400, origin);
           }
+          const before = await db.prepare('SELECT install_status FROM early_adopters WHERE id = ?').bind(eaId).first();
+          if (!before) return error('Early Adopter not found.', 404, origin);
           await db.prepare('UPDATE early_adopters SET install_status = ? WHERE id = ?').bind(installStatus, eaId).run();
+          if (before.install_status !== installStatus) {
+            await notifyEA(db, eaId, {
+              type: 'system',
+              title: installStatus === 'installed' ? 'Your install is complete' : 'Your install status changed',
+              body: installStatus === 'installed'
+                ? 'Howard has been marked as installed on your account.'
+                : "Your install status was updated to 'Scheduled'.",
+              link: 'home'
+            });
+          }
           const row = await db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(eaId).first();
-          if (!row) return error('Early Adopter not found.', 404, origin);
           return json({ earlyAdopter: earlyAdopterToAdminJson(row) }, 200, origin);
         }
 
