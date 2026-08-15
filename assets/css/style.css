@@ -225,7 +225,9 @@ p, .body { font-size: 16px; font-weight: 400; }
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    padding: calc(var(--space-8) + env(safe-area-inset-top)) var(--space-6) var(--space-6);
+    /* Top padding clears the absolutely positioned close button (24px offset
+       + 40px tall), plus a small gap, so the first link never sits under it. */
+    padding: calc(var(--space-8) + var(--space-8) + var(--space-2) + env(safe-area-inset-top)) var(--space-6) var(--space-6);
     gap: 2px;
     opacity: 0;
     visibility: hidden;
