@@ -7,7 +7,7 @@
   <meta name="description" content="Howard AI Early Adopter Platform.">
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="stylesheet" href="assets/css/style.css?v=13">
+  <link rel="stylesheet" href="assets/css/style.css?v=15">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
 </head>
 <body>
@@ -43,9 +43,24 @@
           </div>
         </div>
         <span class="app-nav-divider-v" aria-hidden="true"></span>
-        <button class="app-nav-link app-nav-signout" id="btn-signout">
-          <i class="ti ti-logout" style="font-size:17px"></i> Sign Out
-        </button>
+        <div class="app-nav-dropdown-wrap app-avatar-wrap" id="avatar-dropdown-wrap">
+          <button class="app-avatar-trigger" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+            <span class="app-avatar"></span><span class="app-avatar-trigger-label">Account</span><i class="ti ti-chevron-down app-avatar-trigger-chevron" style="font-size:16px"></i>
+            <span class="app-avatar-notif-dot hidden"></span>
+          </button>
+          <div class="app-nav-dropdown app-avatar-dropdown" role="menu">
+            <button class="app-nav-link app-nav-dropdown-link" data-target="profile" role="menuitem"><i class="ti ti-user" style="font-size:17px"></i> My Profile</button>
+            <button class="app-nav-link app-nav-dropdown-link" data-target="notifications" role="menuitem">
+              <i class="ti ti-bell" style="font-size:17px"></i> Notifications
+              <span class="app-notif-badge hidden">0</span>
+            </button>
+            <button class="app-nav-link app-nav-dropdown-link" data-target="settings" role="menuitem"><i class="ti ti-settings" style="font-size:17px"></i> Settings</button>
+            <span class="app-nav-divider-v" style="width:auto;height:1px;margin:var(--space-2) 0" aria-hidden="true"></span>
+            <button class="app-nav-link app-nav-dropdown-link app-nav-signout" id="btn-signout" role="menuitem">
+              <i class="ti ti-logout" style="font-size:17px"></i> Sign Out
+            </button>
+          </div>
+        </div>
       </nav>
       <nav class="app-nav" id="admin-nav" aria-label="Administrator navigation">
         <button class="app-nav-close" aria-label="Close menu">
@@ -57,9 +72,24 @@
         <button class="app-nav-link" data-target="admin-bugs">Bug Reports</button>
         <button class="app-nav-link" data-target="admin-contact">Messages</button>
         <span class="app-nav-divider-v" aria-hidden="true"></span>
-        <button class="app-nav-link app-nav-signout" id="btn-signout-admin">
-          <i class="ti ti-logout" style="font-size:17px"></i> Sign Out
-        </button>
+        <div class="app-nav-dropdown-wrap app-avatar-wrap" id="avatar-dropdown-wrap-admin">
+          <button class="app-avatar-trigger" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+            <span class="app-avatar"></span><span class="app-avatar-trigger-label">Account</span><i class="ti ti-chevron-down app-avatar-trigger-chevron" style="font-size:16px"></i>
+            <span class="app-avatar-notif-dot hidden"></span>
+          </button>
+          <div class="app-nav-dropdown app-avatar-dropdown" role="menu">
+            <button class="app-nav-link app-nav-dropdown-link" data-target="profile" role="menuitem"><i class="ti ti-user" style="font-size:17px"></i> My Profile</button>
+            <button class="app-nav-link app-nav-dropdown-link" data-target="notifications" role="menuitem">
+              <i class="ti ti-bell" style="font-size:17px"></i> Notifications
+              <span class="app-notif-badge hidden">0</span>
+            </button>
+            <button class="app-nav-link app-nav-dropdown-link" data-target="settings" role="menuitem"><i class="ti ti-settings" style="font-size:17px"></i> Settings</button>
+            <span class="app-nav-divider-v" style="width:auto;height:1px;margin:var(--space-2) 0" aria-hidden="true"></span>
+            <button class="app-nav-link app-nav-dropdown-link app-nav-signout" id="btn-signout-admin" role="menuitem">
+              <i class="ti ti-logout" style="font-size:17px"></i> Sign Out
+            </button>
+          </div>
+        </div>
       </nav>
     </header>
 
@@ -70,6 +100,9 @@
       <div data-view="contact"></div>
       <div data-view="representing"></div>
       <div data-view="refer"></div>
+      <div data-view="profile"></div>
+      <div data-view="notifications"></div>
+      <div data-view="settings"></div>
       <div data-view="admin-overview"></div>
       <div data-view="admin-eas"></div>
       <div data-view="admin-ea-detail"></div>
@@ -81,7 +114,7 @@
 
   <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="assets/js/data.js?v=11"></script>
-  <script src="assets/js/app.js?v=22"></script>
+  <script src="assets/js/data.js?v=12"></script>
+  <script src="assets/js/app.js?v=23"></script>
 </body>
 </html>

@@ -73,7 +73,16 @@ export function earlyAdopterToJson(row) {
     referralSource: row.referral_source,
     referralCode: row.referral_code,
     installStatus: row.install_status,
-    isAdmin: !!row.is_admin
+    isAdmin: !!row.is_admin,
+    avatar: row.avatar || null,
+    reducedMotion: !!row.reduced_motion
+  };
+}
+
+export function notificationToJson(row) {
+  return {
+    id: row.id, type: row.type, title: row.title, body: row.body, link: row.link,
+    readAt: row.read_at, createdAt: row.created_at
   };
 }
 

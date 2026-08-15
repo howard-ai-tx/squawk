@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS early_adopters (
   install_status        TEXT NOT NULL DEFAULT 'scheduled', -- 'scheduled' | 'installed'
   representing_ack_at   TEXT,                           -- NULL until acknowledged
   is_admin              INTEGER NOT NULL DEFAULT 0,      -- 1 = can view the Administrator Platform
+  avatar                TEXT,                            -- data URL (small, client-resized) or NULL
+  reduced_motion         INTEGER NOT NULL DEFAULT 0,      -- 1 = force-disable motion regardless of OS setting
   created_at            TEXT NOT NULL
 );
 
@@ -65,7 +67,21 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at  INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id          TEXT PRIMARY KEY,
+  ea_id       TEXT REFERENCES early_adopters(id) ON DELETE CASCADE, -- targeted at one EA; NULL when audience is used instead
+  audience    TEXT,                -- 'admin' = every is_admin=1 account; NULL when ea_id targets one person
+  type        TEXT NOT NULL,       -- 'feedback'|'bug'|'contact'|'system'
+  title       TEXT NOT NULL,
+  body        TEXT,
+  link        TEXT,                -- a view name the notification should navigate to, e.g. 'admin-feedback'
+  read_at     TEXT,
+  created_at  TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_feedback_ea ON feedback(ea_id);
 CREATE INDEX IF NOT EXISTS idx_bugs_ea ON bug_reports(ea_id);
 CREATE INDEX IF NOT EXISTS idx_contact_ea ON contact_messages(ea_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_ea ON sessions(ea_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_ea ON notifications(ea_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_audience ON notifications(audience);

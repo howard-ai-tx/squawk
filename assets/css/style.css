@@ -202,6 +202,72 @@ p, .body { font-size: 16px; font-weight: 400; }
 .app-nav-dropdown .app-nav-link:hover { background: rgba(255,255,255,0.06); color: var(--action-hover); }
 .app-nav-dropdown .app-nav-link.active { background: rgba(255,255,255,0.08); color: var(--action-hover); font-weight: 700; }
 
+/* ─── ACCOUNT MENU (avatar) ──────────────────────────────────────
+   Reuses the .app-nav-dropdown-wrap/.app-nav-dropdown pattern above,
+   right-aligned since it's the last item in the nav. */
+.app-avatar-wrap .app-nav-dropdown { left: auto; right: 0; min-width: 220px; }
+
+.app-avatar-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+.app-avatar-trigger:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; border-radius: 999px; }
+
+.app-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--action);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.app-avatar-notif-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--error);
+  border: 2px solid var(--surface);
+}
+
+.app-avatar-dropdown .app-nav-link { justify-content: flex-start; position: relative; }
+.app-notif-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-avatar-trigger-label, .app-avatar-trigger-chevron { display: none; }
+
 /* Mobile navigation is a full-screen panel, not a dropdown, per the IDL's
    mobile navigation spec. */
 @media (max-width: 860px) {
@@ -303,12 +369,33 @@ p, .body { font-size: 16px; font-weight: 400; }
     max-height: 200px;
     transition: max-height var(--dur-short) var(--ease-out);
   }
+  /* The account menu has more items (4 links + a divider) than Resources
+     (2 links), so it needs more room before content gets clipped. */
+  .app-avatar-wrap.open .app-nav-dropdown {
+    max-height: 320px;
+  }
   .app-nav-dropdown .app-nav-link {
     color: var(--text-secondary);
     font-size: 17px;
   }
   .app-nav-dropdown .app-nav-link:hover { background: rgba(0,0,0,0.045); color: var(--text-primary); }
   .app-nav-dropdown .app-nav-link.active { background: rgba(0,0,0,0.06); color: var(--text-primary); }
+
+  /* Account menu becomes a full-width row like every other nav item. */
+  .app-avatar-trigger {
+    width: 100%;
+    height: auto;
+    padding: var(--space-4) var(--space-3);
+    border-radius: var(--radius-md);
+    justify-content: flex-start;
+    gap: var(--space-3);
+  }
+  .app-avatar-trigger:hover { background: rgba(0,0,0,0.045); }
+  .app-avatar-trigger-label { display: block; font-size: 19px; font-weight: 700; color: var(--text-primary); }
+  .app-avatar-trigger-chevron { display: block; margin-left: auto; color: var(--text-secondary); }
+  .app-avatar-wrap.open .app-avatar-trigger-chevron { transform: rotate(180deg); }
+  .app-avatar-notif-dot { top: 2px; right: 2px; }
+  .app-avatar-dropdown .app-nav-link { padding-left: var(--space-8); }
 }
 
 .app-main {
@@ -360,6 +447,10 @@ p, .body { font-size: 16px; font-weight: 400; }
 
 .btn-secondary { background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--light-bg); border-color: var(--border-hover); }
+
+.btn-destructive { background: var(--error); color: #fff; }
+.btn-destructive:hover { background: var(--error-hover); }
+.btn-destructive:active { background: #D70015; }
 
 .btn-google {
   background: var(--surface);
@@ -820,3 +911,95 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
     scroll-behavior: auto !important;
   }
 }
+
+/* An in-app override of the above, toggled from Settings — some users want
+   motion off regardless of what their OS preference happens to be. */
+.force-reduced-motion, .force-reduced-motion *, .force-reduced-motion *::before, .force-reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ─── MODAL (confirmation) ────────────────────────────────────────
+   Used for irreversible actions only — Settings > Delete Account today. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  z-index: 300;
+  opacity: 0;
+  animation: modal-overlay-in var(--dur-short) var(--ease-out) forwards;
+}
+@keyframes modal-overlay-in { to { opacity: 1; } }
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.16);
+  opacity: 0;
+  transform: translateY(16px);
+  animation: modal-card-in var(--dur-medium) var(--ease-out) forwards;
+}
+@keyframes modal-card-in { to { opacity: 1; transform: translateY(0); } }
+
+.modal-title { font-size: 24px; font-weight: 700; margin-bottom: var(--space-4); }
+.modal-body { color: var(--text-secondary); font-size: 16px; line-height: 1.5; margin-bottom: var(--space-6); }
+.modal-footer { display: flex; justify-content: flex-end; gap: var(--space-3); }
+
+/* ─── PROFILE ──────────────────────────────────────────────────── */
+
+.profile-avatar-row { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-6); }
+.profile-avatar-large {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: var(--action);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+/* ─── NOTIFICATIONS ────────────────────────────────────────────── */
+
+.notif-item { display: flex; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); cursor: pointer; }
+.notif-item:hover { background: var(--light-bg); }
+.notif-item.unread { background: rgba(14,165,233,0.05); }
+.notif-icon {
+  width: 36px; height: 36px; border-radius: 999px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(14,165,233,0.1); color: var(--action);
+}
+.notif-dot-inline { width: 8px; height: 8px; border-radius: 999px; background: var(--action); flex-shrink: 0; margin-top: 6px; }
+
+/* ─── SETTINGS ─────────────────────────────────────────────────── */
+
+.settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.toggle-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 1; }
+.toggle-track {
+  position: absolute; inset: 0; background: var(--border); border-radius: 999px;
+  transition: background var(--dur-instant) var(--ease-out);
+}
+.toggle-thumb {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 999px;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: transform var(--dur-instant) var(--ease-out);
+}
+.toggle-switch input:checked ~ .toggle-track { background: var(--action); }
+.toggle-switch input:checked ~ .toggle-thumb { transform: translateX(18px); }
+.toggle-switch input:focus-visible ~ .toggle-track { outline: 2px solid var(--action); outline-offset: 2px; }

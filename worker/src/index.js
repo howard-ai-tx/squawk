@@ -1,14 +1,20 @@
 import {
   json, error, genId, hashPassword, verifyPassword, corsHeaders,
-  earlyAdopterToJson, earlyAdopterToAdminJson,
+  earlyAdopterToJson, earlyAdopterToAdminJson, notificationToJson,
   feedbackToJson, bugToJson, contactToJson,
   feedbackToAdminJson, bugToAdminJson, contactToAdminJson
 } from './util.js';
 
 const SESSION_TTL_MS = 86400000; // 24h
+const MAX_AVATAR_BYTES = 250000; // ~250KB data URL, keeps rows small
 
 async function getEARow(db, id) {
   return db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(id).first();
+}
+
+async function notifyAdmins(db, { type, title, body, link }) {
+  await db.prepare('INSERT INTO notifications (id, audience, type, title, body, link, created_at) VALUES (?,?,?,?,?,?,?)')
+    .bind(genId('note'), 'admin', type, title, body || null, link || null, new Date().toISOString()).run();
 }
 
 async function requireAuth(request, env) {
@@ -102,6 +108,85 @@ export default {
           bugCount: bugCount.n,
           contactCount: contactCount.n
         }, 200, origin);
+      }
+
+      // ── MY PROFILE ────────────────────────────────────────────────────────
+      if (path === '/me/profile' && request.method === 'PATCH') {
+        const { name, email } = await request.json();
+        if (!name || !name.trim()) return error('Name is required.', 400, origin);
+        if (!email || !email.trim()) return error('Email is required.', 400, origin);
+        const existing = await db.prepare('SELECT id FROM early_adopters WHERE lower(email) = lower(?) AND id != ?')
+          .bind(email.trim(), me.id).first();
+        if (existing) return error('That email address is already in use.', 400, origin);
+        await db.prepare('UPDATE early_adopters SET name = ?, email = ? WHERE id = ?')
+          .bind(name.trim(), email.trim(), me.id).run();
+        const updated = await getEARow(db, me.id);
+        return json({ earlyAdopter: earlyAdopterToJson(updated) }, 200, origin);
+      }
+
+      if (path === '/me/password' && request.method === 'PATCH') {
+        const { currentPassword, newPassword } = await request.json();
+        if (!newPassword || newPassword.length < 8) return error('New password must be at least 8 characters.', 400, origin);
+        const ok = await verifyPassword(currentPassword || '', me.password_salt, me.password_hash);
+        if (!ok) return error('Current password is incorrect.', 401, origin);
+        const { hash, salt } = await hashPassword(newPassword);
+        await db.prepare('UPDATE early_adopters SET password_hash = ?, password_salt = ? WHERE id = ?')
+          .bind(hash, salt, me.id).run();
+        return json({ ok: true }, 200, origin);
+      }
+
+      if (path === '/me/avatar' && request.method === 'POST') {
+        const { dataUrl } = await request.json();
+        if (dataUrl && dataUrl.length > MAX_AVATAR_BYTES) {
+          return error('That image is too large. Try a smaller photo.', 400, origin);
+        }
+        await db.prepare('UPDATE early_adopters SET avatar = ? WHERE id = ?').bind(dataUrl || null, me.id).run();
+        const updated = await getEARow(db, me.id);
+        return json({ earlyAdopter: earlyAdopterToJson(updated) }, 200, origin);
+      }
+
+      if (path === '/me/settings' && request.method === 'PATCH') {
+        const { reducedMotion } = await request.json();
+        await db.prepare('UPDATE early_adopters SET reduced_motion = ? WHERE id = ?')
+          .bind(reducedMotion ? 1 : 0, me.id).run();
+        const updated = await getEARow(db, me.id);
+        return json({ earlyAdopter: earlyAdopterToJson(updated) }, 200, origin);
+      }
+
+      if (path === '/me' && request.method === 'DELETE') {
+        const authHeader = request.headers.get('Authorization') || '';
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        await db.prepare('DELETE FROM early_adopters WHERE id = ?').bind(me.id).run();
+        if (token) await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+        return json({ ok: true }, 200, origin);
+      }
+
+      // ── NOTIFICATIONS ─────────────────────────────────────────────────────
+      if (path === '/me/notifications' && request.method === 'GET') {
+        const rows = me.is_admin
+          ? await db.prepare('SELECT * FROM notifications WHERE audience = ? OR ea_id = ? ORDER BY created_at DESC LIMIT 50').bind('admin', me.id).all()
+          : await db.prepare('SELECT * FROM notifications WHERE ea_id = ? ORDER BY created_at DESC LIMIT 50').bind(me.id).all();
+        const unread = me.is_admin
+          ? await db.prepare('SELECT COUNT(*) n FROM notifications WHERE (audience = ? OR ea_id = ?) AND read_at IS NULL').bind('admin', me.id).first()
+          : await db.prepare('SELECT COUNT(*) n FROM notifications WHERE ea_id = ? AND read_at IS NULL').bind(me.id).first();
+        return json({ notifications: rows.results.map(notificationToJson), unreadCount: unread.n }, 200, origin);
+      }
+
+      if (path === '/me/notifications/read-all' && request.method === 'POST') {
+        const now = new Date().toISOString();
+        if (me.is_admin) {
+          await db.prepare('UPDATE notifications SET read_at = ? WHERE (audience = ? OR ea_id = ?) AND read_at IS NULL').bind(now, 'admin', me.id).run();
+        } else {
+          await db.prepare('UPDATE notifications SET read_at = ? WHERE ea_id = ? AND read_at IS NULL').bind(now, me.id).run();
+        }
+        return json({ ok: true }, 200, origin);
+      }
+
+      if (path.startsWith('/me/notifications/') && path.endsWith('/read') && request.method === 'POST') {
+        const notifId = path.split('/')[3];
+        await db.prepare('UPDATE notifications SET read_at = ? WHERE id = ? AND (ea_id = ? OR audience = ?)')
+          .bind(new Date().toISOString(), notifId, me.id, me.is_admin ? 'admin' : '__none__').run();
+        return json({ ok: true }, 200, origin);
       }
 
       // ── ADMINISTRATOR PLATFORM (read-only over EA data; view, not create) ──
@@ -219,6 +304,12 @@ export default {
         await db.prepare(`INSERT INTO feedback (id, ea_id, feedback_type, importance, message, where_encountered, additional_notes, created_at) VALUES (?,?,?,?,?,?,?,?)`)
           .bind(id, me.id, f.feedbackType, f.importance, f.message.trim(), f.whereEncountered?.trim() || null, f.additionalNotes?.trim() || null, new Date().toISOString()).run();
         const row = await db.prepare('SELECT * FROM feedback WHERE id = ?').bind(id).first();
+        await notifyAdmins(db, {
+          type: 'feedback',
+          title: `New feedback from ${me.name}`,
+          body: f.message.trim().slice(0, 140),
+          link: 'admin-feedback'
+        });
         return json(feedbackToJson(row), 200, origin);
       }
 
@@ -244,6 +335,12 @@ export default {
           new Date().toISOString()
         ).run();
         const row = await db.prepare('SELECT * FROM bug_reports WHERE id = ?').bind(id).first();
+        await notifyAdmins(db, {
+          type: 'bug',
+          title: `New bug report from ${me.name}`,
+          body: b.title.trim().slice(0, 140),
+          link: 'admin-bugs'
+        });
         return json(bugToJson(row), 200, origin);
       }
 
@@ -255,6 +352,12 @@ export default {
         await db.prepare('INSERT INTO contact_messages (id, ea_id, message, created_at) VALUES (?, ?, ?, ?)')
           .bind(id, me.id, message.trim(), new Date().toISOString()).run();
         const row = await db.prepare('SELECT * FROM contact_messages WHERE id = ?').bind(id).first();
+        await notifyAdmins(db, {
+          type: 'contact',
+          title: `New message from ${me.name}`,
+          body: message.trim().slice(0, 140),
+          link: 'admin-contact'
+        });
         return json(contactToJson(row), 200, origin);
       }
 

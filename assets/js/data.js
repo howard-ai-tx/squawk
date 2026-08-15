@@ -63,6 +63,24 @@ const MyActivity = {
   stats() { return api('/me/stats'); }
 };
 
+const Profile = {
+  update(name, email) { return api('/me/profile', { method: 'PATCH', body: { name, email } }).then(r => r.earlyAdopter); },
+  changePassword(currentPassword, newPassword) { return api('/me/password', { method: 'PATCH', body: { currentPassword, newPassword } }); },
+  setAvatar(dataUrl) { return api('/me/avatar', { method: 'POST', body: { dataUrl } }).then(r => r.earlyAdopter); },
+  removeAvatar() { return api('/me/avatar', { method: 'POST', body: { dataUrl: null } }).then(r => r.earlyAdopter); }
+};
+
+const Settings = {
+  update(fields) { return api('/me/settings', { method: 'PATCH', body: fields }).then(r => r.earlyAdopter); },
+  deleteAccount() { return api('/me', { method: 'DELETE' }); }
+};
+
+const Notifications = {
+  list() { return api('/me/notifications'); },
+  markRead(id) { return api(`/me/notifications/${id}/read`, { method: 'POST' }); },
+  markAllRead() { return api('/me/notifications/read-all', { method: 'POST' }); }
+};
+
 const Feedback = {
   submit(fields) { return api('/feedback', { method: 'POST', body: fields }); }
 };
@@ -93,4 +111,4 @@ const Admin = {
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, MyActivity, Feedback, Bugs, Contact, Admin };
+window.DB = { Auth, MyActivity, Profile, Settings, Notifications, Feedback, Bugs, Contact, Admin };

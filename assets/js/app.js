@@ -22,6 +22,9 @@ function showView(name) {
     a.classList.toggle('active', a.dataset.target === name);
   });
   document.getElementById('resources-trigger')?.classList.toggle('active', name === 'representing' || name === 'refer');
+  document.querySelectorAll('.app-avatar-trigger').forEach(t => {
+    t.classList.toggle('active', ['profile', 'notifications', 'settings'].includes(name));
+  });
 
   if (name === 'home')          renderHome();
   if (name === 'feedback')      renderFeedback();
@@ -29,6 +32,9 @@ function showView(name) {
   if (name === 'contact')       renderContact();
   if (name === 'representing')  renderRepresenting();
   if (name === 'refer')         renderRefer();
+  if (name === 'profile')       renderProfile();
+  if (name === 'notifications') renderNotifications();
+  if (name === 'settings')      renderSettings();
   if (name === 'admin-overview') renderAdminOverview();
   if (name === 'admin-eas')      renderAdminEAs();
   if (name === 'admin-feedback') renderAdminFeedback();
@@ -73,12 +79,48 @@ async function init() {
     showView('login');
   } else {
     applyRoleShell();
+    updateAvatarDisplay();
+    applyReducedMotionSetting();
+    refreshNotifBadge();
     showView(currentEA.isAdmin ? 'admin-overview' : 'home');
   }
 }
 
 function applyRoleShell() {
   document.getElementById('app-shell').classList.toggle('is-admin', !!(currentEA && currentEA.isAdmin));
+}
+
+function initials(name) {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+function updateAvatarDisplay() {
+  if (!currentEA) return;
+  document.querySelectorAll('.app-avatar').forEach(el => {
+    if (currentEA.avatar) {
+      el.style.backgroundImage = `url(${currentEA.avatar})`;
+      el.textContent = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.textContent = initials(currentEA.name);
+    }
+  });
+}
+
+async function refreshNotifBadge() {
+  if (!currentEA) return;
+  try {
+    const { unreadCount } = await DB.Notifications.list();
+    document.querySelectorAll('.app-notif-badge').forEach(el => {
+      el.textContent = String(unreadCount);
+      el.classList.toggle('hidden', unreadCount === 0);
+    });
+    document.querySelectorAll('.app-avatar-notif-dot').forEach(el => {
+      el.classList.toggle('hidden', unreadCount === 0);
+    });
+  } catch { /* best effort */ }
 }
 
 function wirePasswordToggle(inputId, btnId) {
@@ -138,6 +180,10 @@ function renderActivateView(token, name) {
     try {
       currentEA = await DB.Auth.activate(token, password);
       window.history.replaceState({}, '', window.location.pathname);
+      applyRoleShell();
+      updateAvatarDisplay();
+      applyReducedMotionSetting();
+      refreshNotifBadge();
       showView('home');
     } catch (err) {
       document.getElementById('activate-error-text').textContent = err.message;
@@ -196,6 +242,9 @@ function renderLoginView() {
       const password = document.getElementById('login-password').value;
       currentEA = await DB.Auth.login(email, password);
       applyRoleShell();
+      updateAvatarDisplay();
+      applyReducedMotionSetting();
+      refreshNotifBadge();
       showView(currentEA.isAdmin ? 'admin-overview' : 'home');
     } catch (err) {
       document.getElementById('login-error-text').textContent = err.message || 'Email or password is incorrect.';
@@ -765,6 +814,343 @@ function renderRefer() {
   });
 }
 
+// ─── CONFIRMATION MODAL ──────────────────────────────────────────────────────
+// Reserved for irreversible actions, per the IDL — no dismissible overlay,
+// the user must explicitly choose Cancel or the destructive action.
+
+function showConfirmModal({ title, body, confirmLabel, onConfirm }) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="modal-title">
+      <p class="modal-title" id="modal-title">${escHtml(title)}</p>
+      <p class="modal-body">${escHtml(body)}</p>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn btn-destructive" id="modal-confirm">${escHtml(confirmLabel)}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+
+  const close = () => {
+    overlay.remove();
+    document.body.style.overflow = '';
+  };
+  overlay.querySelector('#modal-cancel').addEventListener('click', close);
+  overlay.querySelector('#modal-confirm').addEventListener('click', async () => {
+    const btn = overlay.querySelector('#modal-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Working…';
+    try {
+      await onConfirm();
+      close();
+    } catch (err) {
+      toast(err.message, 'error');
+      btn.disabled = false;
+      btn.textContent = confirmLabel;
+    }
+  });
+}
+
+// ─── MY PROFILE ──────────────────────────────────────────────────────────────
+
+function renderProfile() {
+  const view = document.querySelector('[data-view="profile"]');
+  view.innerHTML = `
+    <div class="page-header"><h1 class="h1">My Profile</h1></div>
+
+    <div class="form-section">
+      <p class="form-section-title">Profile picture</p>
+      <div class="profile-avatar-row">
+        <div class="profile-avatar-large" id="profile-avatar-preview"></div>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="avatar-upload-btn">
+            <i class="ti ti-upload" style="font-size:16px"></i> Upload Photo
+          </button>
+          ${currentEA.avatar ? '<button class="btn btn-secondary btn-sm" id="avatar-remove-btn">Remove Photo</button>' : ''}
+          <input type="file" accept="image/*" id="avatar-file-input" class="hidden">
+        </div>
+      </div>
+      <p class="field-helper">JPG or PNG, resized automatically. Max ~250KB after resizing.</p>
+    </div>
+
+    <form id="profile-form" class="form-section" novalidate>
+      <p class="form-section-title">Account details</p>
+      <div class="field mb-4">
+        <label class="field-label" for="profile-name">Name</label>
+        <input class="input" type="text" id="profile-name" autocomplete="name" value="${escHtml(currentEA.name)}">
+      </div>
+      <div class="field">
+        <label class="field-label" for="profile-email">Email Address</label>
+        <input class="input" type="email" id="profile-email" autocomplete="email" value="${escHtml(currentEA.email)}">
+      </div>
+      <div id="profile-error" class="field-error hidden mt-4">
+        <i class="ti ti-alert-circle" style="font-size:16px"></i>
+        <span id="profile-error-text"></span>
+      </div>
+      <button type="submit" class="btn btn-primary mt-4" id="profile-save-btn">Save Changes</button>
+    </form>
+
+    <form id="password-form" class="form-section" novalidate>
+      <p class="form-section-title">Change password</p>
+      <div class="field mb-4">
+        <label class="field-label" for="current-password">Current Password</label>
+        <input class="input" type="password" id="current-password" autocomplete="current-password">
+      </div>
+      <div class="field mb-4">
+        <label class="field-label" for="new-password">New Password</label>
+        <input class="input" type="password" id="new-password" autocomplete="new-password">
+        <p class="field-helper">Must be at least 8 characters.</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="confirm-password">Confirm New Password</label>
+        <input class="input" type="password" id="confirm-password" autocomplete="new-password">
+      </div>
+      <div id="password-error" class="field-error hidden mt-4">
+        <i class="ti ti-alert-circle" style="font-size:16px"></i>
+        <span id="password-error-text"></span>
+      </div>
+      <button type="submit" class="btn btn-primary mt-4" id="password-save-btn">Update Password</button>
+    </form>
+  `;
+
+  const setAvatarPreview = () => {
+    const el = document.getElementById('profile-avatar-preview');
+    if (currentEA.avatar) {
+      el.style.backgroundImage = `url(${currentEA.avatar})`;
+      el.textContent = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.textContent = initials(currentEA.name);
+    }
+  };
+  setAvatarPreview();
+
+  document.getElementById('avatar-upload-btn').addEventListener('click', () => {
+    document.getElementById('avatar-file-input').click();
+  });
+
+  document.getElementById('avatar-file-input').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 200);
+      currentEA = await DB.Profile.setAvatar(dataUrl);
+      updateAvatarDisplay();
+      setAvatarPreview();
+      renderProfile();
+      toast('Profile picture updated.');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('avatar-remove-btn')?.addEventListener('click', async () => {
+    try {
+      currentEA = await DB.Profile.removeAvatar();
+      updateAvatarDisplay();
+      renderProfile();
+      toast('Profile picture removed.');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('profile-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = document.getElementById('profile-error');
+    errEl.classList.add('hidden');
+    const name = document.getElementById('profile-name').value.trim();
+    const email = document.getElementById('profile-email').value.trim();
+    const btn = document.getElementById('profile-save-btn');
+    btn.disabled = true;
+    try {
+      currentEA = await DB.Profile.update(name, email);
+      showView('home');
+      toast('Changes saved.');
+    } catch (err) {
+      document.getElementById('profile-error-text').textContent = err.message;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('password-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = document.getElementById('password-error');
+    errEl.classList.add('hidden');
+    const current = document.getElementById('current-password').value;
+    const next = document.getElementById('new-password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    if (next !== confirm) {
+      document.getElementById('password-error-text').textContent = 'New password and confirmation do not match.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    const btn = document.getElementById('password-save-btn');
+    btn.disabled = true;
+    try {
+      await DB.Profile.changePassword(current, next);
+      toast('Password updated.');
+      document.getElementById('password-form').reset();
+    } catch (err) {
+      document.getElementById('password-error-text').textContent = err.message;
+      errEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+function resizeImageToDataUrl(file, maxDimension) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      img.onerror = () => reject(new Error('That file is not a readable image.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
+const NOTIF_ICONS = { feedback: 'ti-message-2', bug: 'ti-bug', contact: 'ti-mail', system: 'ti-bell' };
+
+function renderNotifications() {
+  const view = document.querySelector('[data-view="notifications"]');
+  withLoading(view, () => DB.Notifications.list(), ({ notifications }) => {
+    view.innerHTML = `
+      <div class="page-header" style="display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-4)">
+        <h1 class="h1">Notifications</h1>
+        ${notifications.some(n => !n.readAt) ? '<button class="btn btn-secondary btn-sm" id="mark-all-read-btn">Mark all read</button>' : ''}
+      </div>
+      ${notifications.length ? `
+        <div class="form-section">
+          ${notifications.map(n => `
+            <div class="notif-item ${n.readAt ? '' : 'unread'}" data-id="${n.id}" data-link="${n.link || ''}">
+              <div class="notif-icon"><i class="ti ${NOTIF_ICONS[n.type] || 'ti-bell'}" style="font-size:18px"></i></div>
+              <div style="flex:1">
+                <p class="body font-bold">${escHtml(n.title)}</p>
+                ${n.body ? `<p class="body text-secondary">${escHtml(n.body)}</p>` : ''}
+                <p class="text-muted mt-1">${formatDate(n.createdAt)}</p>
+              </div>
+              ${n.readAt ? '' : '<span class="notif-dot-inline" aria-hidden="true"></span>'}
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div class="form-section" style="text-align:center;padding:var(--space-12) var(--space-6)">
+          <i class="ti ti-bell" style="font-size:48px;color:var(--border-hover)"></i>
+          <h3 class="h3 mt-4 mb-2">No notifications yet.</h3>
+          <p class="body text-secondary">${currentEA.isAdmin ? "You'll hear about new feedback, bug reports, and messages here." : "We'll let you know when there's something new."}</p>
+        </div>
+      `}
+    `;
+
+    document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
+      await DB.Notifications.markAllRead();
+      refreshNotifBadge();
+      renderNotifications();
+    });
+
+    view.querySelectorAll('.notif-item.unread').forEach(item => {
+      item.addEventListener('click', async () => {
+        await DB.Notifications.markRead(item.dataset.id);
+        refreshNotifBadge();
+        const link = item.dataset.link;
+        if (link && document.querySelector(`[data-view="${link}"]`)) {
+          showView(link);
+        } else {
+          renderNotifications();
+        }
+      });
+    });
+  });
+}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+
+function applyReducedMotionSetting() {
+  document.documentElement.classList.toggle('force-reduced-motion', !!(currentEA && currentEA.reducedMotion));
+}
+
+function renderSettings() {
+  const view = document.querySelector('[data-view="settings"]');
+  view.innerHTML = `
+    <div class="page-header"><h1 class="h1">Settings</h1></div>
+
+    <div class="form-section">
+      <p class="form-section-title">Accessibility</p>
+      <div class="settings-toggle-row">
+        <div>
+          <p class="body font-bold">Reduce motion</p>
+          <p class="text-muted">Turns off animations and transitions throughout the app, regardless of your device's setting.</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="reduced-motion-toggle" ${currentEA.reducedMotion ? 'checked' : ''}>
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <p class="form-section-title">Danger zone</p>
+      <div class="settings-toggle-row">
+        <div>
+          <p class="body font-bold">Delete account</p>
+          <p class="text-muted">Permanently removes your account and everything you've submitted. This cannot be undone.</p>
+        </div>
+        <button class="btn btn-destructive btn-sm" id="delete-account-btn">Delete Account</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('reduced-motion-toggle').addEventListener('change', async e => {
+    const reducedMotion = e.target.checked;
+    document.documentElement.classList.toggle('force-reduced-motion', reducedMotion);
+    try {
+      currentEA = await DB.Settings.update({ reducedMotion });
+      toast(reducedMotion ? 'Motion reduced.' : 'Motion restored.');
+    } catch (err) {
+      toast(err.message, 'error');
+      e.target.checked = !reducedMotion;
+      applyReducedMotionSetting();
+    }
+  });
+
+  document.getElementById('delete-account-btn').addEventListener('click', () => {
+    showConfirmModal({
+      title: `Delete your account?`,
+      body: `This action cannot be undone. Your profile and everything you've submitted — feedback, bug reports, and messages — will be permanently removed.`,
+      confirmLabel: 'Delete Account',
+      onConfirm: async () => {
+        await DB.Settings.deleteAccount();
+        DB.Auth.logout();
+        currentEA = null;
+        document.getElementById('app-shell').classList.remove('is-admin');
+        renderLoginView();
+        showView('login');
+        toast('Your account has been deleted.');
+      }
+    });
+  });
+}
+
 // ─── ADMINISTRATOR PLATFORM ─────────────────────────────────────────────────
 // Read-only over Early Adopter data — admins view what EAs submit, they don't
 // create EA accounts here (that stays a deliberate, off-platform step).
@@ -1106,6 +1492,10 @@ function closeMobileNav() {
   toggle.setAttribute('aria-expanded', 'false');
   document.body.style.overflow = '';
   closeResourcesDropdown();
+  document.querySelectorAll('.app-avatar-wrap.open').forEach(wrap => {
+    wrap.classList.remove('open');
+    wrap.querySelector('.app-avatar-trigger')?.setAttribute('aria-expanded', 'false');
+  });
 }
 
 function closeResourcesDropdown() {
@@ -1135,6 +1525,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeResourcesDropdown();
+  });
+
+  document.querySelectorAll('.app-avatar-trigger').forEach(trigger => {
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      const wrap = trigger.closest('.app-avatar-wrap');
+      const open = wrap.classList.toggle('open');
+      trigger.setAttribute('aria-expanded', String(open));
+    });
+  });
+  document.addEventListener('click', e => {
+    document.querySelectorAll('.app-avatar-wrap.open').forEach(wrap => {
+      if (!wrap.contains(e.target)) {
+        wrap.classList.remove('open');
+        wrap.querySelector('.app-avatar-trigger')?.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.app-avatar-wrap.open').forEach(wrap => {
+        wrap.classList.remove('open');
+        wrap.querySelector('.app-avatar-trigger')?.setAttribute('aria-expanded', 'false');
+      });
+    }
   });
 
   document.getElementById('app-nav-toggle')?.addEventListener('click', () => {
