@@ -3,6 +3,10 @@
 // ─── STATE ────────────────────────────────────────────────────────────────────
 
 let currentEA = null;
+// Notification ids we've told the server to mark read, kept client-side so a
+// re-fetch shortly after (e.g. navigating back to Notifications) can't show
+// them as unread again if the write hasn't fully propagated yet.
+let locallyReadNotifIds = new Set();
 
 // ─── ROUTER ───────────────────────────────────────────────────────────────────
 
@@ -112,8 +116,12 @@ function updateAvatarDisplay() {
 async function refreshNotifBadge() {
   if (!currentEA) return;
   try {
-    const { unreadCount } = await DB.Notifications.list();
-    setNotifBadgeCount(unreadCount);
+    const { notifications } = await DB.Notifications.list();
+    // Compute unread count from the raw list (and override with what we
+    // know we've already marked read client-side) rather than trusting the
+    // server's unreadCount, which can briefly lag a just-committed write.
+    const unread = notifications.filter(n => !n.readAt && !locallyReadNotifIds.has(n.id)).length;
+    setNotifBadgeCount(unread);
   } catch { /* best effort */ }
 }
 
@@ -1043,6 +1051,9 @@ const NOTIF_ICONS = { feedback: 'ti-message-2', bug: 'ti-bug', contact: 'ti-mail
 function renderNotifications() {
   const view = document.querySelector('[data-view="notifications"]');
   withLoading(view, () => DB.Notifications.list(), ({ notifications }) => {
+    // A locally-read id always renders as read, even if this fetch's data
+    // hasn't caught up to the write yet — see locallyReadNotifIds above.
+    notifications = notifications.map(n => locallyReadNotifIds.has(n.id) ? { ...n, readAt: n.readAt || 'local' } : n);
     view.innerHTML = `
       <div class="page-header" style="display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-4)">
         <h1 class="h1">Notifications</h1>
@@ -1072,12 +1083,14 @@ function renderNotifications() {
     `;
 
     document.getElementById('mark-all-read-btn')?.addEventListener('click', async function() {
-      // Optimistic: reflect "all read" immediately rather than waiting on a
-      // re-fetch, since D1 reads can briefly lag just-committed writes.
+      // Optimistic + remembered locally: reflect "all read" immediately, and
+      // keep it that way even if a re-fetch shortly after this still returns
+      // stale unread data (D1 reads can briefly lag just-committed writes).
       this.remove();
       view.querySelectorAll('.notif-item.unread').forEach(item => {
         item.classList.remove('unread');
         item.querySelector('.notif-dot-inline')?.remove();
+        locallyReadNotifIds.add(item.dataset.id);
       });
       setNotifBadgeCount(0);
       try {
@@ -1090,11 +1103,12 @@ function renderNotifications() {
 
     view.querySelectorAll('.notif-item.unread').forEach(item => {
       item.addEventListener('click', async () => {
-        // Optimistic: update this item and the badge immediately so it
-        // visibly "goes away" the instant you click, before the API call
-        // (and any D1 read-after-write lag) resolves.
+        // Optimistic + remembered locally (see locallyReadNotifIds above) —
+        // this item stays "read" even if you navigate away and back before
+        // the write has fully propagated.
         item.classList.remove('unread');
         item.querySelector('.notif-dot-inline')?.remove();
+        locallyReadNotifIds.add(item.dataset.id);
         setNotifBadgeCount(Math.max(0, currentNotifBadgeCount() - 1));
 
         const link = item.dataset.link;
