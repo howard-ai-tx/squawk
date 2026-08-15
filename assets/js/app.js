@@ -279,7 +279,7 @@ function renderLoginView() {
 const HOME_QUICK_LINKS = [
   { target: 'feedback',     icon: 'ti-message-2',    title: 'Feedback/Suggestions', body: 'Tell us what to change, add, or keep.' },
   { target: 'bug',          icon: 'ti-bug',           title: 'Report a Bug',         body: "Something not working as it should? Let us know." },
-  { target: 'contact',      icon: 'ti-mail',          title: 'Messages',             body: 'Chat directly with Hendrik and Tucker.' },
+  { target: 'contact',      icon: 'ti-message-circle-2', title: 'Messages',          body: 'Chat directly with Hendrik and Tucker.' },
   { target: 'representing', icon: 'ti-shield-check',  title: 'Representing HowardAI',body: 'What to share when people ask about Howard.' },
   { target: 'refer',        icon: 'ti-user-plus',     title: 'Refer Someone',        body: 'Share your personal invite link.' }
 ];
@@ -1179,7 +1179,7 @@ function resizeImageToDataUrl(file, maxDimension, quality = 0.82) {
 
 // ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
 
-const NOTIF_ICONS = { feedback: 'ti-message-2', bug: 'ti-bug', contact: 'ti-mail', system: 'ti-bell' };
+const NOTIF_ICONS = { feedback: 'ti-message-2', bug: 'ti-bug', contact: 'ti-message-circle-2', system: 'ti-bell' };
 
 function renderNotifications() {
   const view = document.querySelector('[data-view="notifications"]');
