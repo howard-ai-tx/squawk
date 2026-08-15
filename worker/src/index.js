@@ -7,6 +7,7 @@ import {
 
 const SESSION_TTL_MS = 86400000; // 24h
 const MAX_AVATAR_BYTES = 250000; // ~250KB data URL, keeps rows small
+const MAX_ATTACHMENT_BYTES = 600000; // ~600KB data URL, client-resized before upload
 
 async function getEARow(db, id) {
   return db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(id).first();
@@ -203,16 +204,18 @@ export default {
       }
 
       if (path === '/messages' && request.method === 'POST') {
-        const { message } = await request.json();
-        if (!message || !message.trim()) return error('Message cannot be empty.', 400, origin);
+        const { message, attachment } = await request.json();
+        const text = (message || '').trim();
+        if (!text && !attachment) return error('Message cannot be empty.', 400, origin);
+        if (attachment && attachment.length > MAX_ATTACHMENT_BYTES) return error('That image is too large.', 400, origin);
         const id = genId('msg');
-        await db.prepare("INSERT INTO messages (id, ea_id, sender, message, created_at) VALUES (?, ?, 'ea', ?, ?)")
-          .bind(id, me.id, message.trim(), new Date().toISOString()).run();
+        await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, created_at) VALUES (?, ?, 'ea', ?, ?, ?)")
+          .bind(id, me.id, text, attachment || null, new Date().toISOString()).run();
         const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
         await notifyAdmins(db, {
           type: 'contact',
           title: `New message from ${me.name}`,
-          body: message.trim().slice(0, 140),
+          body: text ? text.slice(0, 140) : 'Sent a photo.',
           link: `admin-conversation:${me.id}`
         });
         return json(messageToJson(row), 200, origin);
@@ -362,16 +365,18 @@ export default {
           const eaId = parts[2];
           const eaRow = await getEARow(db, eaId);
           if (!eaRow) return error('Early Adopter not found.', 404, origin);
-          const { message } = await request.json();
-          if (!message || !message.trim()) return error('Message cannot be empty.', 400, origin);
+          const { message, attachment } = await request.json();
+          const text = (message || '').trim();
+          if (!text && !attachment) return error('Message cannot be empty.', 400, origin);
+          if (attachment && attachment.length > MAX_ATTACHMENT_BYTES) return error('That image is too large.', 400, origin);
           const id = genId('msg');
-          await db.prepare("INSERT INTO messages (id, ea_id, sender, message, created_at) VALUES (?, ?, 'admin', ?, ?)")
-            .bind(id, eaId, message.trim(), new Date().toISOString()).run();
+          await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, created_at) VALUES (?, ?, 'admin', ?, ?, ?)")
+            .bind(id, eaId, text, attachment || null, new Date().toISOString()).run();
           const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
           await notifyEA(db, eaId, {
             type: 'contact',
             title: 'New reply from HowardAI',
-            body: message.trim().slice(0, 140),
+            body: text ? text.slice(0, 140) : 'Sent a photo.',
             link: 'contact'
           });
           return json(messageToJson(row), 200, origin);

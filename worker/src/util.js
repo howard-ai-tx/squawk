@@ -132,6 +132,7 @@ export function bugToJson(row) {
 export function messageToJson(row) {
   return {
     id: row.id, sender: row.sender, message: row.message,
+    attachment: row.attachment || null,
     readAt: row.read_at, createdAt: row.created_at
   };
 }

@@ -94,7 +94,7 @@ const Bugs = {
 // The EA's single conversation thread with HowardAI.
 const Messages = {
   thread() { return api('/messages').then(r => r.messages); },
-  send(message) { return api('/messages', { method: 'POST', body: { message } }); }
+  send(message, attachment) { return api('/messages', { method: 'POST', body: { message, attachment } }); }
 };
 
 // ─── ADMIN (read-only over Early Adopter data, except conversation replies) ──
@@ -110,7 +110,7 @@ const Admin = {
   bugs() { return api('/admin/bugs').then(r => r.bugs); },
   conversations() { return api('/admin/conversations').then(r => r.conversations); },
   conversation(eaId) { return api(`/admin/conversations/${eaId}`); },
-  reply(eaId, message) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message } }); }
+  reply(eaId, message, attachment) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message, attachment } }); }
 };
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────

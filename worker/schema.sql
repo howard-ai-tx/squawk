@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS messages (
   id            TEXT PRIMARY KEY,
   ea_id         TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,
   sender        TEXT NOT NULL DEFAULT 'ea', -- 'ea' | 'admin'
-  message       TEXT NOT NULL,
+  message       TEXT NOT NULL,       -- may be '' when the message is attachment-only
+  attachment    TEXT,                -- data URL (client-resized image) or NULL
   read_at       TEXT,               -- NULL until the other side has viewed it
   created_at    TEXT NOT NULL
 );

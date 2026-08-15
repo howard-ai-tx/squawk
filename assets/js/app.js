@@ -747,17 +747,29 @@ function chatBubblesHtml(messages, mineSender) {
     const mine = m.sender === mineSender;
     html += `
       <div class="chat-row ${mine ? 'mine' : 'theirs'}">
-        <div class="chat-bubble">${escHtml(m.message)}</div>
+        ${m.attachment ? `<img class="chat-attachment-img" src="${m.attachment}" alt="Attachment">` : ''}
+        ${m.message ? `<div class="chat-bubble">${escHtml(m.message)}</div>` : ''}
+        <div class="chat-bubble-time">${formatChatTime(m.createdAt)}</div>
       </div>
     `;
   });
-  html += `<div class="chat-timestamp" id="chat-last-timestamp">${formatChatTime(messages[messages.length - 1].createdAt)}</div>`;
   return html;
 }
 
-function wireChatInput({ formId, textareaId, sendBtnId, scrollId, onSend }) {
+function wireChatInput({ formId, textareaId, sendBtnId, attachBtnId, fileInputId, previewId, onSend }) {
   const form = document.getElementById(formId);
   const textarea = document.getElementById(textareaId);
+  const attachBtn = document.getElementById(attachBtnId);
+  const fileInput = document.getElementById(fileInputId);
+  const previewEl = document.getElementById(previewId);
+  let pendingAttachment = null;
+
+  const clearAttachment = () => {
+    pendingAttachment = null;
+    previewEl.innerHTML = '';
+    previewEl.classList.add('hidden');
+    fileInput.value = '';
+  };
 
   const autoGrow = () => {
     textarea.style.height = 'auto';
@@ -771,17 +783,38 @@ function wireChatInput({ formId, textareaId, sendBtnId, scrollId, onSend }) {
     }
   });
 
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    try {
+      pendingAttachment = await resizeImageToDataUrl(file, 1024, 0.75);
+      previewEl.classList.remove('hidden');
+      previewEl.innerHTML = `
+        <div class="chat-attach-preview">
+          <img src="${pendingAttachment}" alt="">
+          <button type="button" class="chat-attach-remove" aria-label="Remove photo"><i class="ti ti-x" style="font-size:14px"></i></button>
+        </div>
+      `;
+      previewEl.querySelector('.chat-attach-remove').addEventListener('click', clearAttachment);
+    } catch (err) {
+      toast(err.message, 'error');
+      clearAttachment();
+    }
+  });
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const message = textarea.value.trim();
-    if (!message) return;
+    if (!message && !pendingAttachment) return;
     const btn = document.getElementById(sendBtnId);
     btn.disabled = true;
     textarea.disabled = true;
     try {
-      await onSend(message);
+      await onSend(message, pendingAttachment);
       textarea.value = '';
       autoGrow();
+      clearAttachment();
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -797,23 +830,45 @@ function scrollChatToBottom(scrollId) {
   if (el) el.scrollTop = el.scrollHeight;
 }
 
+function chatInputBarHtml(formId, textareaId, sendBtnId, attachBtnId, fileInputId, previewId) {
+  return `
+    <div class="chat-attach-preview-wrap hidden" id="${previewId}"></div>
+    <form id="${formId}" class="chat-input-bar" novalidate>
+      <button type="button" class="chat-attach-btn" id="${attachBtnId}" aria-label="Attach a photo">
+        <i class="ti ti-paperclip" style="font-size:19px"></i>
+      </button>
+      <input type="file" accept="image/*" id="${fileInputId}" class="hidden">
+      <textarea class="input" id="${textareaId}" placeholder="Message…" rows="1"></textarea>
+      <button type="submit" class="btn btn-primary chat-send-btn" id="${sendBtnId}" aria-label="Send">
+        <i class="ti ti-arrow-up" style="font-size:18px"></i>
+      </button>
+    </form>
+  `;
+}
+
+// Same avatar+name header style used for every conversation thread, so the
+// EA's own thread and an admin's view of it feel like the same product.
+function chatHeaderHtml(name, subtitle, avatar) {
+  return `
+    <div class="page-header" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-6)">
+      <div class="convo-avatar" style="${avatar ? `background-image:url(${avatar})` : ''}">${avatar ? '' : initials(name)}</div>
+      <div>
+        <h1 class="h1" style="font-size:22px">${escHtml(name)}</h1>
+        <p class="text-muted">${escHtml(subtitle)}</p>
+      </div>
+    </div>
+  `;
+}
+
 function renderContact() {
   const view = document.querySelector('[data-view="contact"]');
   view.innerHTML = `
-    <div class="page-header">
-      <h1 class="h1 mb-2">Messages</h1>
-      <p class="body text-secondary">A direct line to Hendrik and Tucker.</p>
-    </div>
+    ${chatHeaderHtml('HowardAI Team', 'Hendrik & Tucker')}
     <div class="card chat-card">
       <div class="chat-scroll" id="contact-chat-scroll">
         <div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>
       </div>
-      <form id="contact-form" class="chat-input-bar" novalidate>
-        <textarea class="input" id="contact-message" placeholder="Message…" rows="1"></textarea>
-        <button type="submit" class="btn btn-primary chat-send-btn" id="contact-send-btn" aria-label="Send">
-          <i class="ti ti-arrow-up" style="font-size:18px"></i>
-        </button>
-      </form>
+      ${chatInputBarHtml('contact-form', 'contact-message', 'contact-send-btn', 'contact-attach-btn', 'contact-file-input', 'contact-attach-preview')}
     </div>
   `;
 
@@ -828,9 +883,11 @@ function renderContact() {
     formId: 'contact-form',
     textareaId: 'contact-message',
     sendBtnId: 'contact-send-btn',
-    scrollId: 'contact-chat-scroll',
-    onSend: async message => {
-      await DB.Messages.send(message);
+    attachBtnId: 'contact-attach-btn',
+    fileInputId: 'contact-file-input',
+    previewId: 'contact-attach-preview',
+    onSend: async (message, attachment) => {
+      await DB.Messages.send(message, attachment);
       const messages = await DB.Messages.thread();
       document.getElementById('contact-chat-scroll').innerHTML = chatBubblesHtml(messages, 'ea');
       scrollChatToBottom('contact-chat-scroll');
@@ -1098,7 +1155,7 @@ function renderProfile() {
   });
 }
 
-function resizeImageToDataUrl(file, maxDimension) {
+function resizeImageToDataUrl(file, maxDimension, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
@@ -1112,7 +1169,7 @@ function resizeImageToDataUrl(file, maxDimension) {
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.src = reader.result;
     };
@@ -1623,21 +1680,10 @@ function renderAdminConversation(eaId) {
       <button class="btn btn-secondary btn-sm mb-4" id="admin-convo-back-btn">
         <i class="ti ti-arrow-left" style="font-size:16px"></i> Back to Messages
       </button>
-      <div class="page-header" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-6)">
-        <div class="convo-avatar" style="${earlyAdopter.avatar ? `background-image:url(${earlyAdopter.avatar})` : ''}">${earlyAdopter.avatar ? '' : initials(earlyAdopter.name)}</div>
-        <div>
-          <h1 class="h1" style="font-size:22px">${escHtml(earlyAdopter.name)}</h1>
-          <p class="text-muted">${escHtml(earlyAdopter.email)}</p>
-        </div>
-      </div>
+      ${chatHeaderHtml(earlyAdopter.name, earlyAdopter.email, earlyAdopter.avatar)}
       <div class="card chat-card">
         <div class="chat-scroll" id="admin-chat-scroll">${chatBubblesHtml(messages, 'admin')}</div>
-        <form id="admin-reply-form" class="chat-input-bar" novalidate>
-          <textarea class="input" id="admin-reply-message" placeholder="Message…" rows="1"></textarea>
-          <button type="submit" class="btn btn-primary chat-send-btn" id="admin-reply-send-btn" aria-label="Send">
-            <i class="ti ti-arrow-up" style="font-size:18px"></i>
-          </button>
-        </form>
+        ${chatInputBarHtml('admin-reply-form', 'admin-reply-message', 'admin-reply-send-btn', 'admin-reply-attach-btn', 'admin-reply-file-input', 'admin-reply-attach-preview')}
       </div>
     `;
     scrollChatToBottom('admin-chat-scroll');
@@ -1648,9 +1694,11 @@ function renderAdminConversation(eaId) {
       formId: 'admin-reply-form',
       textareaId: 'admin-reply-message',
       sendBtnId: 'admin-reply-send-btn',
-      scrollId: 'admin-chat-scroll',
-      onSend: async message => {
-        await DB.Admin.reply(eaId, message);
+      attachBtnId: 'admin-reply-attach-btn',
+      fileInputId: 'admin-reply-file-input',
+      previewId: 'admin-reply-attach-preview',
+      onSend: async (message, attachment) => {
+        await DB.Admin.reply(eaId, message, attachment);
         const { messages } = await DB.Admin.conversation(eaId);
         document.getElementById('admin-chat-scroll').innerHTML = chatBubblesHtml(messages, 'admin');
         scrollChatToBottom('admin-chat-scroll');
