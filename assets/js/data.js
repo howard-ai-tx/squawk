@@ -111,7 +111,8 @@ const Admin = {
   bugs() { return api('/admin/bugs').then(r => r.bugs); },
   conversations() { return api('/admin/conversations').then(r => r.conversations); },
   conversation(eaId) { return api(`/admin/conversations/${eaId}`); },
-  reply(eaId, message, attachment) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message, attachment } }); }
+  reply(eaId, message, attachment) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message, attachment } }); },
+  clearConversation(eaId) { return api(`/admin/conversations/${eaId}/messages`, { method: 'DELETE' }); }
 };
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────

@@ -391,6 +391,17 @@ export default {
           return json(messageToJson(row), 200, origin);
         }
 
+        // Clear a conversation — wipes the whole thread with this EA. Unlike
+        // the rest of the Administrator Platform this deletes data, so it's
+        // deliberately gated behind a confirmation modal on the frontend.
+        if (parts.length === 4 && parts[1] === 'conversations' && parts[3] === 'messages' && request.method === 'DELETE') {
+          const eaId = parts[2];
+          const eaRow = await getEARow(db, eaId);
+          if (!eaRow) return error('Early Adopter not found.', 404, origin);
+          await db.prepare('DELETE FROM messages WHERE ea_id = ?').bind(eaId).run();
+          return json({ ok: true }, 200, origin);
+        }
+
         return error('Not found.', 404, origin);
       }
 

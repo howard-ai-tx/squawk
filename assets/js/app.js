@@ -1694,9 +1694,16 @@ function renderAdminConversation(eaId) {
 
   DB.Admin.conversation(eaId).then(({ earlyAdopter, messages }) => {
     view.innerHTML = `
-      <button class="btn btn-secondary btn-sm mb-4" id="admin-convo-back-btn">
-        <i class="ti ti-arrow-left" style="font-size:16px"></i> Back to Messages
-      </button>
+      <div class="mb-4" style="display:flex;justify-content:space-between;align-items:center">
+        <button class="btn btn-secondary btn-sm" id="admin-convo-back-btn">
+          <i class="ti ti-arrow-left" style="font-size:16px"></i> Back to Messages
+        </button>
+        ${messages.length ? `
+          <button class="btn btn-secondary btn-sm" id="admin-clear-chat-btn">
+            <i class="ti ti-trash" style="font-size:16px"></i> Clear Chat
+          </button>
+        ` : ''}
+      </div>
       ${chatHeaderHtml(earlyAdopter.name, earlyAdopter.email, earlyAdopter.avatar)}
       <div class="card chat-card">
         <div class="chat-scroll" id="admin-chat-scroll">${chatBubblesHtml(messages, 'admin')}</div>
@@ -1706,6 +1713,18 @@ function renderAdminConversation(eaId) {
     scrollChatToBottom('admin-chat-scroll');
 
     document.getElementById('admin-convo-back-btn').addEventListener('click', () => showView('admin-contact'));
+
+    document.getElementById('admin-clear-chat-btn')?.addEventListener('click', () => {
+      showConfirmModal({
+        title: `Clear chat with ${earlyAdopter.name}?`,
+        body: 'This permanently deletes every message in this conversation for both sides. This cannot be undone.',
+        confirmLabel: 'Clear Chat',
+        onConfirm: async () => {
+          await DB.Admin.clearConversation(eaId);
+          renderAdminConversation(eaId);
+        }
+      });
+    });
 
     wireChatInput({
       formId: 'admin-reply-form',
