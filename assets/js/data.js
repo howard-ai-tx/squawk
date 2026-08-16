@@ -60,7 +60,8 @@ const Auth = {
 // ─── ACTIONS ──────────────────────────────────────────────────────────────────
 
 const MyActivity = {
-  stats() { return api('/me/stats'); }
+  stats() { return api('/me/stats'); },
+  messageUnreadCount() { return api('/me/message-unread-count').then(r => r.unreadCount); }
 };
 
 const Profile = {

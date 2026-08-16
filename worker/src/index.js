@@ -116,6 +116,16 @@ export default {
         }, 200, origin);
       }
 
+      // Unread-message count for the Messages nav badge — lives on the nav
+      // link itself instead of the notification center, to avoid showing
+      // the same "new message" signal in two places at once.
+      if (path === '/me/message-unread-count' && request.method === 'GET') {
+        const row = me.is_admin
+          ? await db.prepare("SELECT COUNT(*) n FROM messages WHERE sender = 'ea' AND read_at IS NULL").first()
+          : await db.prepare("SELECT COUNT(*) n FROM messages WHERE ea_id = ? AND sender = 'admin' AND read_at IS NULL").bind(me.id).first();
+        return json({ unreadCount: row.n }, 200, origin);
+      }
+
       // ── MY PROFILE ────────────────────────────────────────────────────────
       if (path === '/me/profile' && request.method === 'PATCH') {
         const { name, email } = await request.json();
@@ -221,12 +231,9 @@ export default {
         await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, created_at) VALUES (?, ?, 'ea', ?, ?, ?)")
           .bind(id, me.id, text, attachment || null, new Date().toISOString()).run();
         const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
-        await notifyAdmins(db, {
-          type: 'contact',
-          title: `New message from ${me.name}`,
-          body: text ? text.slice(0, 140) : 'Sent a photo.',
-          link: `admin-conversation:${me.id}`
-        });
+        // Unread messages surface as a badge on the Messages nav link itself
+        // (see /me/message-unread-count), not as a duplicate notification-
+        // center entry.
         return json(messageToJson(row), 200, origin);
       }
 
@@ -382,12 +389,6 @@ export default {
           await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, created_at) VALUES (?, ?, 'admin', ?, ?, ?)")
             .bind(id, eaId, text, attachment || null, new Date().toISOString()).run();
           const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
-          await notifyEA(db, eaId, {
-            type: 'contact',
-            title: 'New reply from HowardAI',
-            body: text ? text.slice(0, 140) : 'Sent a photo.',
-            link: 'contact'
-          });
           return json(messageToJson(row), 200, origin);
         }
 

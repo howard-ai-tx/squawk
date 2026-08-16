@@ -86,6 +86,7 @@ async function init() {
     updateAvatarDisplay();
     applyReducedMotionSetting();
     refreshNotifBadge();
+    refreshMessagesBadge();
     showView(currentEA.isAdmin ? 'admin-overview' : 'home');
   }
 }
@@ -122,6 +123,17 @@ async function refreshNotifBadge() {
     // server's unreadCount, which can briefly lag a just-committed write.
     const unread = notifications.filter(n => !n.readAt && !locallyReadNotifIds.has(n.id)).length;
     setNotifBadgeCount(unread);
+  } catch { /* best effort */ }
+}
+
+async function refreshMessagesBadge() {
+  if (!currentEA) return;
+  try {
+    const unread = await DB.MyActivity.messageUnreadCount();
+    document.querySelectorAll('.nav-msg-badge').forEach(el => {
+      el.textContent = String(unread);
+      el.classList.toggle('hidden', unread === 0);
+    });
   } catch { /* best effort */ }
 }
 
@@ -202,6 +214,7 @@ function renderActivateView(token, name) {
       updateAvatarDisplay();
       applyReducedMotionSetting();
       refreshNotifBadge();
+      refreshMessagesBadge();
       showView('home');
     } catch (err) {
       document.getElementById('activate-error-text').textContent = err.message;
@@ -263,6 +276,7 @@ function renderLoginView() {
       updateAvatarDisplay();
       applyReducedMotionSetting();
       refreshNotifBadge();
+      refreshMessagesBadge();
       showView(currentEA.isAdmin ? 'admin-overview' : 'home');
     } catch (err) {
       document.getElementById('login-error-text').textContent = err.message || 'Email or password is incorrect.';
@@ -876,6 +890,7 @@ function renderContact() {
   DB.Messages.thread().then(messages => {
     document.getElementById('contact-chat-scroll').innerHTML = chatBubblesHtml(messages, 'ea');
     scrollChatToBottom('contact-chat-scroll');
+    refreshMessagesBadge();
   }).catch(err => {
     document.getElementById('contact-chat-scroll').innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
   });
@@ -1711,6 +1726,7 @@ function renderAdminConversation(eaId) {
       </div>
     `;
     scrollChatToBottom('admin-chat-scroll');
+    refreshMessagesBadge();
 
     document.getElementById('admin-convo-back-btn').addEventListener('click', () => showView('admin-contact'));
 

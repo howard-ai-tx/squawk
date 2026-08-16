@@ -273,6 +273,23 @@ p, .body { font-size: 16px; font-weight: 400; }
 
 .app-avatar-trigger-label, .app-avatar-trigger-chevron { display: none; }
 
+/* Unread-message count on the Messages nav link itself — the badge lives
+   here instead of the notification center so the same "new message" signal
+   never shows in two places at once. */
+.nav-msg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 /* Mobile navigation is a full-screen panel, not a dropdown, per the IDL's
    mobile navigation spec. */
 @media (max-width: 860px) {
