@@ -1009,6 +1009,17 @@ function renderRefer() {
 
 // ─── NEWSROOM ─────────────────────────────────────────────────────────────────
 
+const POST_CATEGORIES = [
+  { value: 'update', label: 'Software Update' },
+  { value: 'bug_fix', label: 'Bug Fix' },
+  { value: 'feature', label: 'New Feature' },
+  { value: 'announcement', label: 'Announcement' },
+  { value: 'general', label: 'General' }
+];
+const POST_CATEGORY_LABELS = Object.fromEntries(POST_CATEGORIES.map(c => [c.value, c.label]));
+const POST_COVER_W = 1600;
+const POST_COVER_H = 900;
+
 function renderNewsroom() {
   const view = document.querySelector('[data-view="newsroom"]');
   withLoading(view, () => DB.Posts.list(), posts => {
@@ -1023,9 +1034,10 @@ function renderNewsroom() {
             <div class="card post-card" data-id="${p.id}">
               ${p.coverImage ? `<img class="post-card-cover" src="${p.coverImage}" alt="">` : ''}
               <div class="post-card-body">
+                ${p.category ? `<span class="post-category-badge mb-2">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
                 <h3 class="h3 mb-1">${escHtml(p.title)}</h3>
-                <p class="text-muted mb-2">${formatDate(p.createdAt)} · ${escHtml(p.authorName)}</p>
-                <p class="body text-secondary post-card-snippet">${escHtml(p.body)}</p>
+                <p class="text-muted mb-2">${formatDate(p.createdAt)}</p>
+                <p class="body text-secondary post-card-snippet">${escHtml(stripHtmlToText(p.body))}</p>
               </div>
             </div>
           `).join('')}
@@ -1060,9 +1072,10 @@ function renderPostDetail(id) {
       </button>
       <article class="card post-article">
         ${p.coverImage ? `<img class="post-article-cover" src="${p.coverImage}" alt="">` : ''}
+        ${p.category ? `<span class="post-category-badge mb-2">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
         <h1 class="h1 mb-2">${escHtml(p.title)}</h1>
-        <p class="text-muted mb-6">${formatDate(p.createdAt)} · ${escHtml(p.authorName)}</p>
-        <div class="body post-article-body">${formatPostBody(p.body)}</div>
+        <p class="text-muted mb-6">${formatDate(p.createdAt)}</p>
+        <div class="body post-article-body">${p.body}</div>
       </article>
     `;
     document.getElementById('post-back-btn').addEventListener('click', () => showView('newsroom'));
@@ -1550,6 +1563,7 @@ function renderAdminOverview() {
 
 let adminPostEditingId = null;
 let adminPostPendingCover = null;
+let adminPostSelectionHandler = null;
 
 function renderAdminNewsroom() {
   const view = document.querySelector('[data-view="admin-newsroom"]');
@@ -1569,6 +1583,12 @@ function renderAdminNewsroom() {
           <input class="input" type="text" id="post-title-input">
         </div>
         <div class="field mb-4">
+          <label class="field-label" for="post-category-input">Category</label>
+          <select class="input" id="post-category-input">
+            ${POST_CATEGORIES.map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field mb-4">
           <label class="field-label" for="post-body-input">Body</label>
           <div class="post-body-toolbar" role="toolbar" aria-label="Formatting">
             <button type="button" class="post-body-tool-btn" data-fmt="bold" aria-label="Bold"><i class="ti ti-bold" style="font-size:16px"></i></button>
@@ -1577,7 +1597,7 @@ function renderAdminNewsroom() {
             <button type="button" class="post-body-tool-btn" data-fmt="bullet" aria-label="Bullet list"><i class="ti ti-list" style="font-size:16px"></i></button>
             <button type="button" class="post-body-tool-btn" data-fmt="numbered" aria-label="Numbered list"><i class="ti ti-list-numbers" style="font-size:16px"></i></button>
           </div>
-          <textarea class="input" id="post-body-input" style="min-height:140px"></textarea>
+          <div class="input post-body-editor" id="post-body-input" contenteditable="true" data-placeholder="Write the post…"></div>
         </div>
         <div class="field mb-4">
           <label class="field-label">Cover image</label>
@@ -1588,7 +1608,7 @@ function renderAdminNewsroom() {
             <input type="file" accept="image/*" id="post-cover-input" class="hidden">
             <div id="post-cover-preview"></div>
           </div>
-          <p class="text-muted mt-2">Banner image shown at the top of the post. Recommended: landscape, 1600×900px or wider.</p>
+          <p class="text-muted mt-2">Banner image shown at the top of the post. Automatically cropped to a consistent ${POST_COVER_W}×${POST_COVER_H} size.</p>
         </div>
         <div id="post-form-error" class="field-error hidden mb-4">
           <i class="ti ti-alert-circle" style="font-size:16px"></i>
@@ -1612,7 +1632,7 @@ function renderAdminNewsroom() {
                 </span>
               </div>
               <p class="body admin-record-title">${escHtml(p.title)}</p>
-              <p class="admin-record-meta">${escHtml(p.body)}</p>
+              <p class="admin-record-meta">${p.category ? `${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)} · ` : ''}${escHtml(stripHtmlToText(p.body))}</p>
             </div>
           `).join('')}
         </div>
@@ -1620,6 +1640,7 @@ function renderAdminNewsroom() {
     `;
 
     const titleInput = document.getElementById('post-title-input');
+    const categoryInput = document.getElementById('post-category-input');
     const bodyInput = document.getElementById('post-body-input');
     const coverPreview = document.getElementById('post-cover-preview');
     const errEl = document.getElementById('post-form-error');
@@ -1637,16 +1658,28 @@ function renderAdminNewsroom() {
       const file = e.target.files[0];
       if (!file) return;
       try {
-        adminPostPendingCover = await resizeImageToDataUrl(file, 1024, 0.75);
+        adminPostPendingCover = await cropToCoverDataUrl(file, POST_COVER_W, POST_COVER_H);
         renderCoverPreview();
       } catch (err) {
         toast(err.message, 'error');
       }
     });
 
-    view.querySelectorAll('.post-body-tool-btn').forEach(btn => {
-      btn.addEventListener('click', () => applyPostBodyFormat(bodyInput, btn.dataset.fmt));
+    const toolBtns = view.querySelectorAll('.post-body-tool-btn');
+    const updateToolbarState = () => updatePostBodyToolbarState(toolBtns);
+    toolBtns.forEach(btn => {
+      btn.addEventListener('mousedown', e => e.preventDefault());
+      btn.addEventListener('click', () => {
+        applyPostBodyFormat(bodyInput, btn.dataset.fmt);
+        updateToolbarState();
+      });
     });
+    bodyInput.addEventListener('keyup', updateToolbarState);
+    bodyInput.addEventListener('mouseup', updateToolbarState);
+    bodyInput.addEventListener('focus', updateToolbarState);
+    if (adminPostSelectionHandler) document.removeEventListener('selectionchange', adminPostSelectionHandler);
+    adminPostSelectionHandler = updateToolbarState;
+    document.addEventListener('selectionchange', adminPostSelectionHandler);
 
     document.getElementById('post-form-cancel-btn').addEventListener('click', () => renderAdminNewsroom());
 
@@ -1657,7 +1690,8 @@ function renderAdminNewsroom() {
         adminPostEditingId = p.id;
         adminPostPendingCover = p.coverImage;
         titleInput.value = p.title;
-        bodyInput.value = p.body;
+        categoryInput.value = p.category || 'general';
+        bodyInput.innerHTML = p.body;
         renderCoverPreview();
         document.getElementById('post-form-title').textContent = 'Edit Post';
         document.getElementById('post-form-submit-btn').textContent = 'Save Changes';
@@ -1686,8 +1720,8 @@ function renderAdminNewsroom() {
       e.preventDefault();
       errEl.classList.add('hidden');
       const title = titleInput.value.trim();
-      const body = bodyInput.value.trim();
-      if (!title || !body) {
+      const body = sanitizeEditorHtml(bodyInput.innerHTML);
+      if (!title || !stripHtmlToText(body).trim()) {
         document.getElementById('post-form-error-text').textContent = 'Title and body are required.';
         errEl.classList.remove('hidden');
         return;
@@ -1695,7 +1729,7 @@ function renderAdminNewsroom() {
       const btn = document.getElementById('post-form-submit-btn');
       btn.disabled = true;
       try {
-        const fields = { title, body, coverImage: adminPostPendingCover };
+        const fields = { title, body, coverImage: adminPostPendingCover, category: categoryInput.value };
         if (adminPostEditingId) {
           await DB.Admin.updatePost(adminPostEditingId, fields);
           toast('Post updated.');
@@ -2027,74 +2061,110 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Renders lightweight markdown (bold/italic/links/lists) written via the
-// post-body toolbar. Input is HTML-escaped first, so this is safe even
-// though the surrounding tags below are inserted after escaping.
-function formatPostBody(str) {
-  if (!str) return '';
-  const lines = escHtml(str).split('\n');
-  const inline = s => s
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
-    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+// Cleans up the contenteditable post-body editor's innerHTML down to a small
+// allowlist before it's stored, so admin-authored posts can't smuggle in
+// arbitrary markup (styles, scripts, spans) via paste or execCommand quirks.
+function sanitizeEditorHtml(html) {
+  const TAG_MAP = { B: 'strong', STRONG: 'strong', I: 'em', EM: 'em', UL: 'ul', OL: 'ol', LI: 'li', BR: 'br', A: 'a', DIV: 'p', P: 'p' };
+  const container = document.createElement('div');
+  container.innerHTML = html;
 
-  let html = '';
-  let listType = null;
-  const closeList = () => { if (listType) { html += listType === 'ul' ? '</ul>' : '</ol>'; listType = null; } };
-
-  for (const rawLine of lines) {
-    const bullet = /^-\s+(.*)/.exec(rawLine);
-    const numbered = /^\d+\.\s+(.*)/.exec(rawLine);
-    if (bullet) {
-      if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
-      html += `<li>${inline(bullet[1])}</li>`;
-    } else if (numbered) {
-      if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
-      html += `<li>${inline(numbered[1])}</li>`;
-    } else {
-      closeList();
-      html += rawLine.trim() ? `<p>${inline(rawLine)}</p>` : '<br>';
+  const walk = node => {
+    let out = '';
+    for (const child of node.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += escHtml(child.textContent);
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = TAG_MAP[child.tagName];
+        if (!tag) { out += walk(child); continue; }
+        if (tag === 'br') {
+          out += '<br>';
+        } else if (tag === 'a') {
+          const href = child.getAttribute('href') || '';
+          out += /^https?:\/\//i.test(href)
+            ? `<a href="${escHtml(href)}" target="_blank" rel="noopener noreferrer">${walk(child)}</a>`
+            : walk(child);
+        } else {
+          out += `<${tag}>${walk(child)}</${tag}>`;
+        }
+      }
     }
-  }
-  closeList();
-  return html;
+    return out;
+  };
+  return walk(container);
 }
 
-// Wraps or prefixes the textarea's current selection with markdown-lite
-// syntax, matching what formatPostBody() renders.
-function applyPostBodyFormat(textarea, fmt) {
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const value = textarea.value;
-  const selected = value.slice(start, end);
+// Plain-text extraction for the card-grid snippet — the stored body is
+// already-sanitized HTML, so this is just for display, not a security boundary.
+function stripHtmlToText(html) {
+  const el = document.createElement('div');
+  el.innerHTML = html;
+  return el.textContent || '';
+}
 
-  let insert, selStart, selEnd;
-  if (fmt === 'bold') {
-    insert = `**${selected || 'bold text'}**`;
-    selStart = start + 2;
-    selEnd = selStart + (selected || 'bold text').length;
-  } else if (fmt === 'italic') {
-    insert = `*${selected || 'italic text'}*`;
-    selStart = start + 1;
-    selEnd = selStart + (selected || 'italic text').length;
-  } else if (fmt === 'link') {
-    const label = selected || 'link text';
-    insert = `[${label}](https://)`;
-    selStart = start + label.length + 3;
-    selEnd = selStart + 8;
-  } else if (fmt === 'bullet' || fmt === 'numbered') {
-    const prefix = fmt === 'bullet' ? '- ' : '1. ';
-    const lines = (selected || 'list item').split('\n').map(l => prefix + l);
-    insert = lines.join('\n');
-    selStart = start;
-    selEnd = start + insert.length;
-  } else {
-    return;
+// Applies real formatting live in the contenteditable post-body editor via
+// execCommand, so admins see actual bold/italic while typing instead of
+// markdown syntax.
+function applyPostBodyFormat(editor, cmd) {
+  editor.focus();
+  if (cmd === 'bold') document.execCommand('bold');
+  else if (cmd === 'italic') document.execCommand('italic');
+  else if (cmd === 'bullet') document.execCommand('insertUnorderedList');
+  else if (cmd === 'numbered') document.execCommand('insertOrderedList');
+  else if (cmd === 'link') {
+    const sel = window.getSelection();
+    const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    const url = window.prompt('Link URL (https://...)');
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) { toast('Links must start with http:// or https://', 'error'); return; }
+    editor.focus();
+    if (range) { sel.removeAllRanges(); sel.addRange(range); }
+    document.execCommand('createLink', false, url);
   }
+}
 
-  textarea.value = value.slice(0, start) + insert + value.slice(end);
-  textarea.focus();
-  textarea.setSelectionRange(selStart, selEnd);
+// Highlights toolbar buttons whose formatting is active at the current
+// cursor position/selection, so bold/italic/list state is visible while typing.
+function updatePostBodyToolbarState(toolBtns) {
+  const CMD_MAP = { bold: 'bold', italic: 'italic', bullet: 'insertUnorderedList', numbered: 'insertOrderedList' };
+  toolBtns.forEach(btn => {
+    const cmd = CMD_MAP[btn.dataset.fmt];
+    if (!cmd) return;
+    let active = false;
+    try { active = document.queryCommandState(cmd); } catch { /* unsupported */ }
+    btn.classList.toggle('active', active);
+  });
+}
+
+// Center-crops the source image to a fixed aspect ratio before resizing, so
+// every post banner renders at the same dimensions regardless of what the
+// admin uploads.
+function cropToCoverDataUrl(file, targetW, targetH, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      img.onerror = () => reject(new Error('That file is not a readable image.'));
+      img.onload = () => {
+        const targetRatio = targetW / targetH;
+        const srcRatio = img.width / img.height;
+        let sx, sy, sw, sh;
+        if (srcRatio > targetRatio) {
+          sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0;
+        } else {
+          sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────

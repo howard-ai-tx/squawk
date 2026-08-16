@@ -9,6 +9,7 @@ const SESSION_TTL_MS = 86400000; // 24h
 const MAX_AVATAR_BYTES = 250000; // ~250KB data URL, keeps rows small
 const MAX_ATTACHMENT_BYTES = 600000; // ~600KB data URL, client-resized before upload
 const MAX_COVER_IMAGE_BYTES = 600000; // ~600KB data URL, client-resized before upload
+const POST_CATEGORIES = ['update', 'bug_fix', 'feature', 'announcement', 'general'];
 
 async function getEARow(db, id) {
   return db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(id).first();
@@ -492,13 +493,14 @@ export default {
         // an intentional exception to the "admins only view EA data" rule:
         // admins are authoring content here, not managing EA accounts.
         if (parts.length === 2 && parts[1] === 'posts' && request.method === 'POST') {
-          const { title, body, coverImage } = await request.json();
+          const { title, body, coverImage, category } = await request.json();
           if (!title || !title.trim()) return error('Title is required.', 400, origin);
           if (!body || !body.trim()) return error('Body is required.', 400, origin);
           if (coverImage && coverImage.length > MAX_COVER_IMAGE_BYTES) return error('That image is too large.', 400, origin);
+          if (category && !POST_CATEGORIES.includes(category)) return error('Invalid category.', 400, origin);
           const id = genId('post');
-          await db.prepare('INSERT INTO posts (id, title, body, cover_image, author_name, created_at) VALUES (?,?,?,?,?,?)')
-            .bind(id, title.trim(), body.trim(), coverImage || null, me.name, new Date().toISOString()).run();
+          await db.prepare('INSERT INTO posts (id, title, body, cover_image, category, author_name, created_at) VALUES (?,?,?,?,?,?,?)')
+            .bind(id, title.trim(), body.trim(), coverImage || null, category || null, me.name, new Date().toISOString()).run();
           const row = await db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first();
           await notifyAllEAs(db, {
             type: 'post',
@@ -513,12 +515,13 @@ export default {
           const postId = parts[2];
           const existing = await db.prepare('SELECT id FROM posts WHERE id = ?').bind(postId).first();
           if (!existing) return error('Post not found.', 404, origin);
-          const { title, body, coverImage } = await request.json();
+          const { title, body, coverImage, category } = await request.json();
           if (!title || !title.trim()) return error('Title is required.', 400, origin);
           if (!body || !body.trim()) return error('Body is required.', 400, origin);
           if (coverImage && coverImage.length > MAX_COVER_IMAGE_BYTES) return error('That image is too large.', 400, origin);
-          await db.prepare('UPDATE posts SET title = ?, body = ?, cover_image = ?, updated_at = ? WHERE id = ?')
-            .bind(title.trim(), body.trim(), coverImage || null, new Date().toISOString(), postId).run();
+          if (category && !POST_CATEGORIES.includes(category)) return error('Invalid category.', 400, origin);
+          await db.prepare('UPDATE posts SET title = ?, body = ?, cover_image = ?, category = ?, updated_at = ? WHERE id = ?')
+            .bind(title.trim(), body.trim(), coverImage || null, category || null, new Date().toISOString(), postId).run();
           const row = await db.prepare('SELECT * FROM posts WHERE id = ?').bind(postId).first();
           return json(postToJson(row), 200, origin);
         }

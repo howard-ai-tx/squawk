@@ -141,7 +141,7 @@ export function postToJson(row) {
   return {
     id: row.id, title: row.title, body: row.body,
     coverImage: row.cover_image || null,
-    authorName: row.author_name,
+    category: row.category || null,
     createdAt: row.created_at, updatedAt: row.updated_at
   };
 }

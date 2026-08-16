@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS posts (
   id            TEXT PRIMARY KEY,
   title         TEXT NOT NULL,
   body          TEXT NOT NULL,
-  cover_image   TEXT,               -- data URL (client-resized image) or NULL
+  cover_image   TEXT,               -- data URL (client-resized, fixed-aspect-cropped image) or NULL
+  category      TEXT,               -- 'update' | 'bug_fix' | 'feature' | 'announcement' | 'general'
   author_name   TEXT NOT NULL,
   created_at    TEXT NOT NULL,
   updated_at    TEXT
