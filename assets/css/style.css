@@ -1214,6 +1214,10 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 
 /* ─── NEWSROOM ─────────────────────────────────────────────────── */
 
+.newsroom-filters {
+  display: flex; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-6);
+}
+
 .post-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

@@ -1024,6 +1024,32 @@ function isNewPost(createdAt) {
   return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000;
 }
 
+const POST_TIME_RANGES = [
+  { value: 'all', label: 'All time', ms: null },
+  { value: 'hour', label: 'Last hour', ms: 60 * 60 * 1000 },
+  { value: 'day', label: 'Last 24 hours', ms: 24 * 60 * 60 * 1000 },
+  { value: 'week', label: 'Last week', ms: 7 * 24 * 60 * 60 * 1000 },
+  { value: 'month', label: 'Last month', ms: 30 * 24 * 60 * 60 * 1000 },
+  { value: 'year', label: 'Last year', ms: 365 * 24 * 60 * 60 * 1000 }
+];
+
+function postCardHtml(p) {
+  return `
+    <div class="card post-card" data-id="${p.id}">
+      ${p.coverImage ? `<img class="post-card-cover" src="${p.coverImage}" alt="">` : ''}
+      <div class="post-card-body">
+        <span class="mb-2" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+          ${isNewPost(p.createdAt) ? `<span class="post-new-badge">New</span>` : ''}
+          ${p.category ? `<span class="post-category-badge">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
+        </span>
+        <h3 class="h3 mb-1">${escHtml(p.title)}</h3>
+        <p class="text-muted mb-2">${formatDate(p.createdAt)}</p>
+        <p class="body text-secondary post-card-snippet">${escHtml(stripHtmlToText(p.body))}</p>
+      </div>
+    </div>
+  `;
+}
+
 function renderNewsroom() {
   const view = document.querySelector('[data-view="newsroom"]');
   withLoading(view, () => DB.Posts.list(), posts => {
@@ -1033,21 +1059,20 @@ function renderNewsroom() {
         <p class="body text-secondary">Updates and posts from the HowardAI team.</p>
       </div>
       ${posts.length ? `
-        <div class="post-grid">
-          ${posts.map(p => `
-            <div class="card post-card" data-id="${p.id}">
-              ${p.coverImage ? `<img class="post-card-cover" src="${p.coverImage}" alt="">` : ''}
-              <div class="post-card-body">
-                <span class="mb-2" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
-                  ${p.category ? `<span class="post-category-badge">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
-                  ${isNewPost(p.createdAt) ? `<span class="post-new-badge">New</span>` : ''}
-                </span>
-                <h3 class="h3 mb-1">${escHtml(p.title)}</h3>
-                <p class="text-muted mb-2">${formatDate(p.createdAt)}</p>
-                <p class="body text-secondary post-card-snippet">${escHtml(stripHtmlToText(p.body))}</p>
-              </div>
-            </div>
-          `).join('')}
+        <div class="newsroom-filters">
+          <select class="input" id="newsroom-category-filter" style="max-width:220px">
+            <option value="all">All categories</option>
+            ${POST_CATEGORIES.map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
+          </select>
+          <select class="input" id="newsroom-time-filter" style="max-width:200px">
+            ${POST_TIME_RANGES.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="post-grid" id="newsroom-post-grid"></div>
+        <div class="form-section hidden" id="newsroom-empty-filtered" style="text-align:center;padding:var(--space-12) var(--space-6)">
+          <i class="ti ti-filter-off" style="font-size:48px;color:var(--border-hover)"></i>
+          <h3 class="h3 mt-4 mb-2">No posts match those filters.</h3>
+          <p class="body text-secondary">Try a different category or time range.</p>
         </div>
       ` : `
         <div class="form-section" style="text-align:center;padding:var(--space-12) var(--space-6)">
@@ -1057,9 +1082,33 @@ function renderNewsroom() {
         </div>
       `}
     `;
-    view.querySelectorAll('.post-card').forEach(el => {
-      el.addEventListener('click', () => showPostDetail(el.dataset.id));
-    });
+
+    if (!posts.length) return;
+
+    const grid = document.getElementById('newsroom-post-grid');
+    const emptyFiltered = document.getElementById('newsroom-empty-filtered');
+    const categoryFilter = document.getElementById('newsroom-category-filter');
+    const timeFilter = document.getElementById('newsroom-time-filter');
+
+    const applyFilters = () => {
+      const category = categoryFilter.value;
+      const range = POST_TIME_RANGES.find(r => r.value === timeFilter.value) || POST_TIME_RANGES[0];
+      const filtered = posts.filter(p => {
+        if (category !== 'all' && p.category !== category) return false;
+        if (range.ms && Date.now() - new Date(p.createdAt).getTime() > range.ms) return false;
+        return true;
+      });
+      grid.innerHTML = filtered.map(postCardHtml).join('');
+      grid.classList.toggle('hidden', filtered.length === 0);
+      emptyFiltered.classList.toggle('hidden', filtered.length > 0);
+      grid.querySelectorAll('.post-card').forEach(el => {
+        el.addEventListener('click', () => showPostDetail(el.dataset.id));
+      });
+    };
+
+    categoryFilter.addEventListener('change', applyFilters);
+    timeFilter.addEventListener('change', applyFilters);
+    applyFilters();
   });
 }
 
@@ -1080,8 +1129,8 @@ function renderPostDetail(id) {
       <article class="card post-article">
         ${p.coverImage ? `<img class="post-article-cover" src="${p.coverImage}" alt="">` : ''}
         <span class="mb-2" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
-          ${p.category ? `<span class="post-category-badge">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
           ${isNewPost(p.createdAt) ? `<span class="post-new-badge">New</span>` : ''}
+          ${p.category ? `<span class="post-category-badge">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
         </span>
         <h1 class="h1 mb-2">${escHtml(p.title)}</h1>
         <p class="text-muted mb-6">${formatDate(p.createdAt)}</p>
