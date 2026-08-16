@@ -1020,6 +1020,10 @@ const POST_CATEGORY_LABELS = Object.fromEntries(POST_CATEGORIES.map(c => [c.valu
 const POST_COVER_W = 1600;
 const POST_COVER_H = 900;
 
+function isNewPost(createdAt) {
+  return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000;
+}
+
 function renderNewsroom() {
   const view = document.querySelector('[data-view="newsroom"]');
   withLoading(view, () => DB.Posts.list(), posts => {
@@ -1034,7 +1038,10 @@ function renderNewsroom() {
             <div class="card post-card" data-id="${p.id}">
               ${p.coverImage ? `<img class="post-card-cover" src="${p.coverImage}" alt="">` : ''}
               <div class="post-card-body">
-                ${p.category ? `<span class="post-category-badge mb-2">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
+                <span class="mb-2" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+                  ${p.category ? `<span class="post-category-badge">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
+                  ${isNewPost(p.createdAt) ? `<span class="post-new-badge">New</span>` : ''}
+                </span>
                 <h3 class="h3 mb-1">${escHtml(p.title)}</h3>
                 <p class="text-muted mb-2">${formatDate(p.createdAt)}</p>
                 <p class="body text-secondary post-card-snippet">${escHtml(stripHtmlToText(p.body))}</p>
@@ -1072,7 +1079,10 @@ function renderPostDetail(id) {
       </button>
       <article class="card post-article">
         ${p.coverImage ? `<img class="post-article-cover" src="${p.coverImage}" alt="">` : ''}
-        ${p.category ? `<span class="post-category-badge mb-2">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
+        <span class="mb-2" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+          ${p.category ? `<span class="post-category-badge">${escHtml(POST_CATEGORY_LABELS[p.category] || p.category)}</span>` : ''}
+          ${isNewPost(p.createdAt) ? `<span class="post-new-badge">New</span>` : ''}
+        </span>
         <h1 class="h1 mb-2">${escHtml(p.title)}</h1>
         <p class="text-muted mb-6">${formatDate(p.createdAt)}</p>
         <div class="body post-article-body">${p.body}</div>
