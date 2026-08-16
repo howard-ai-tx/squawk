@@ -137,6 +137,15 @@ export function messageToJson(row) {
   };
 }
 
+export function postToJson(row) {
+  return {
+    id: row.id, title: row.title, body: row.body,
+    coverImage: row.cover_image || null,
+    authorName: row.author_name,
+    createdAt: row.created_at, updatedAt: row.updated_at
+  };
+}
+
 // ─── ADMIN-FACING VARIANTS (include the submitting EA's identity) ──────────
 
 export function feedbackToAdminJson(row) {

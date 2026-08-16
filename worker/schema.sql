@@ -66,6 +66,19 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at    TEXT NOT NULL
 );
 
+-- Admin-authored posts, visible to every Early Adopter. Unlike the rest of
+-- the Administrator Platform, this is a genuine create/edit/delete area for
+-- admins — they're authoring content here, not just viewing EA data.
+CREATE TABLE IF NOT EXISTS posts (
+  id            TEXT PRIMARY KEY,
+  title         TEXT NOT NULL,
+  body          TEXT NOT NULL,
+  cover_image   TEXT,               -- data URL (client-resized image) or NULL
+  author_name   TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   token       TEXT PRIMARY KEY,
   ea_id       TEXT NOT NULL REFERENCES early_adopters(id) ON DELETE CASCADE,

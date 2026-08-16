@@ -1,13 +1,14 @@
 import {
   json, error, genId, hashPassword, verifyPassword, corsHeaders, ALLOWED_ORIGINS,
   earlyAdopterToJson, earlyAdopterToAdminJson, notificationToJson,
-  feedbackToJson, bugToJson, messageToJson,
+  feedbackToJson, bugToJson, messageToJson, postToJson,
   feedbackToAdminJson, bugToAdminJson
 } from './util.js';
 
 const SESSION_TTL_MS = 86400000; // 24h
 const MAX_AVATAR_BYTES = 250000; // ~250KB data URL, keeps rows small
 const MAX_ATTACHMENT_BYTES = 600000; // ~600KB data URL, client-resized before upload
+const MAX_COVER_IMAGE_BYTES = 600000; // ~600KB data URL, client-resized before upload
 
 async function getEARow(db, id) {
   return db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(id).first();
@@ -21,6 +22,18 @@ async function notifyAdmins(db, { type, title, body, link }) {
 async function notifyEA(db, eaId, { type, title, body, link }) {
   await db.prepare('INSERT INTO notifications (id, ea_id, type, title, body, link, created_at) VALUES (?,?,?,?,?,?,?)')
     .bind(genId('note'), eaId, type, title, body || null, link || null, new Date().toISOString()).run();
+}
+
+// Broadcasts insert one row per EA (not a shared "audience" row) so each
+// person has their own independent read state — a shared row would mean
+// one EA marking it read marks it read for everyone.
+async function notifyAllEAs(db, { type, title, body, link }) {
+  const eas = await db.prepare('SELECT id FROM early_adopters WHERE is_admin = 0 AND password_hash IS NOT NULL').all();
+  const now = new Date().toISOString();
+  for (const ea of eas.results) {
+    await db.prepare('INSERT INTO notifications (id, ea_id, type, title, body, link, created_at) VALUES (?,?,?,?,?,?,?)')
+      .bind(genId('note'), ea.id, type, title, body || null, link || null, now).run();
+  }
 }
 
 async function requireAuth(request, env) {
@@ -296,6 +309,19 @@ export default {
         return json(messageToJson(row), 200, origin);
       }
 
+      // ── NEWSROOM (admin-authored posts, visible to every EA) ─────────────
+      if (path === '/posts' && request.method === 'GET') {
+        const rows = await db.prepare('SELECT * FROM posts ORDER BY created_at DESC').all();
+        return json({ posts: rows.results.map(postToJson) }, 200, origin);
+      }
+
+      if (path.startsWith('/posts/') && request.method === 'GET') {
+        const postId = path.split('/')[2];
+        const row = await db.prepare('SELECT * FROM posts WHERE id = ?').bind(postId).first();
+        if (!row) return error('Post not found.', 404, origin);
+        return json(postToJson(row), 200, origin);
+      }
+
       // ── ADMINISTRATOR PLATFORM (read-only over EA data; view, not create) ──
       if (path.startsWith('/admin/')) {
         if (!me.is_admin) return error('Not authorized.', 403, origin);
@@ -459,6 +485,49 @@ export default {
           const eaRow = await getEARow(db, eaId);
           if (!eaRow) return error('Early Adopter not found.', 404, origin);
           await db.prepare('DELETE FROM messages WHERE ea_id = ?').bind(eaId).run();
+          return json({ ok: true }, 200, origin);
+        }
+
+        // Newsroom — this is a genuine create/edit/delete area for admins,
+        // an intentional exception to the "admins only view EA data" rule:
+        // admins are authoring content here, not managing EA accounts.
+        if (parts.length === 2 && parts[1] === 'posts' && request.method === 'POST') {
+          const { title, body, coverImage } = await request.json();
+          if (!title || !title.trim()) return error('Title is required.', 400, origin);
+          if (!body || !body.trim()) return error('Body is required.', 400, origin);
+          if (coverImage && coverImage.length > MAX_COVER_IMAGE_BYTES) return error('That image is too large.', 400, origin);
+          const id = genId('post');
+          await db.prepare('INSERT INTO posts (id, title, body, cover_image, author_name, created_at) VALUES (?,?,?,?,?,?)')
+            .bind(id, title.trim(), body.trim(), coverImage || null, me.name, new Date().toISOString()).run();
+          const row = await db.prepare('SELECT * FROM posts WHERE id = ?').bind(id).first();
+          await notifyAllEAs(db, {
+            type: 'post',
+            title: `New post: ${title.trim()}`,
+            body: body.trim().slice(0, 140),
+            link: 'newsroom'
+          });
+          return json(postToJson(row), 200, origin);
+        }
+
+        if (parts.length === 3 && parts[1] === 'posts' && request.method === 'PATCH') {
+          const postId = parts[2];
+          const existing = await db.prepare('SELECT id FROM posts WHERE id = ?').bind(postId).first();
+          if (!existing) return error('Post not found.', 404, origin);
+          const { title, body, coverImage } = await request.json();
+          if (!title || !title.trim()) return error('Title is required.', 400, origin);
+          if (!body || !body.trim()) return error('Body is required.', 400, origin);
+          if (coverImage && coverImage.length > MAX_COVER_IMAGE_BYTES) return error('That image is too large.', 400, origin);
+          await db.prepare('UPDATE posts SET title = ?, body = ?, cover_image = ?, updated_at = ? WHERE id = ?')
+            .bind(title.trim(), body.trim(), coverImage || null, new Date().toISOString(), postId).run();
+          const row = await db.prepare('SELECT * FROM posts WHERE id = ?').bind(postId).first();
+          return json(postToJson(row), 200, origin);
+        }
+
+        if (parts.length === 3 && parts[1] === 'posts' && request.method === 'DELETE') {
+          const postId = parts[2];
+          const existing = await db.prepare('SELECT id FROM posts WHERE id = ?').bind(postId).first();
+          if (!existing) return error('Post not found.', 404, origin);
+          await db.prepare('DELETE FROM posts WHERE id = ?').bind(postId).run();
           return json({ ok: true }, 200, origin);
         }
 

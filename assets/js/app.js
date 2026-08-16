@@ -36,10 +36,12 @@ function showView(name) {
   if (name === 'contact')       renderContact();
   if (name === 'representing')  renderRepresenting();
   if (name === 'refer')         renderRefer();
+  if (name === 'newsroom')      renderNewsroom();
   if (name === 'profile')       renderProfile();
   if (name === 'notifications') renderNotifications();
   if (name === 'settings')      renderSettings();
   if (name === 'admin-overview') renderAdminOverview();
+  if (name === 'admin-newsroom') renderAdminNewsroom();
   if (name === 'admin-eas')      renderAdminEAs();
   if (name === 'admin-feedback') renderAdminFeedback();
   if (name === 'admin-bugs')     renderAdminBugs();
@@ -317,6 +319,7 @@ const HOME_QUICK_LINKS = [
   { target: 'feedback',     icon: 'ti-message-2',    title: 'Feedback/Suggestions', body: 'Tell us what to change, add, or keep.' },
   { target: 'bug',          icon: 'ti-bug',           title: 'Report a Bug',         body: "Something not working as it should? Let us know." },
   { target: 'contact',      icon: 'ti-message-circle-2', title: 'Messages',          body: 'Chat directly with Hendrik and Tucker.' },
+  { target: 'newsroom',     icon: 'ti-news',          title: 'Newsroom',            body: 'Updates and posts from the HowardAI team.' },
   { target: 'representing', icon: 'ti-shield-check',  title: 'Representing HowardAI',body: 'What to share when people ask about Howard.' },
   { target: 'refer',        icon: 'ti-user-plus',     title: 'Refer Someone',        body: 'Share your personal invite link.' }
 ];
@@ -1004,6 +1007,70 @@ function renderRefer() {
   });
 }
 
+// ─── NEWSROOM ─────────────────────────────────────────────────────────────────
+
+function renderNewsroom() {
+  const view = document.querySelector('[data-view="newsroom"]');
+  withLoading(view, () => DB.Posts.list(), posts => {
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Newsroom</h1>
+        <p class="body text-secondary">Updates and posts from the HowardAI team.</p>
+      </div>
+      ${posts.length ? `
+        <div class="post-grid">
+          ${posts.map(p => `
+            <div class="card post-card" data-id="${p.id}">
+              ${p.coverImage ? `<img class="post-card-cover" src="${p.coverImage}" alt="">` : ''}
+              <div class="post-card-body">
+                <h3 class="h3 mb-1">${escHtml(p.title)}</h3>
+                <p class="text-muted mb-2">${formatDate(p.createdAt)} · ${escHtml(p.authorName)}</p>
+                <p class="body text-secondary post-card-snippet">${escHtml(p.body)}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div class="form-section" style="text-align:center;padding:var(--space-12) var(--space-6)">
+          <i class="ti ti-news" style="font-size:48px;color:var(--border-hover)"></i>
+          <h3 class="h3 mt-4 mb-2">No posts yet.</h3>
+          <p class="body text-secondary">Updates from the HowardAI team will show up here.</p>
+        </div>
+      `}
+    `;
+    view.querySelectorAll('.post-card').forEach(el => {
+      el.addEventListener('click', () => showPostDetail(el.dataset.id));
+    });
+  });
+}
+
+function showPostDetail(id) {
+  showView('post-detail');
+  renderPostDetail(id);
+}
+
+function renderPostDetail(id) {
+  const view = document.querySelector('[data-view="post-detail"]');
+  view.innerHTML = `<div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>`;
+
+  DB.Posts.get(id).then(p => {
+    view.innerHTML = `
+      <button class="btn btn-secondary btn-sm mb-6" id="post-back-btn">
+        <i class="ti ti-arrow-left" style="font-size:16px"></i> Back to Newsroom
+      </button>
+      <article class="card post-article">
+        ${p.coverImage ? `<img class="post-article-cover" src="${p.coverImage}" alt="">` : ''}
+        <h1 class="h1 mb-2">${escHtml(p.title)}</h1>
+        <p class="text-muted mb-6">${formatDate(p.createdAt)} · ${escHtml(p.authorName)}</p>
+        <div class="body post-article-body">${formatPostBody(p.body)}</div>
+      </article>
+    `;
+    document.getElementById('post-back-btn').addEventListener('click', () => showView('newsroom'));
+  }).catch(err => {
+    view.innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
+  });
+}
+
 // ─── CONFIRMATION MODAL ──────────────────────────────────────────────────────
 // Reserved for irreversible actions, per the IDL — no dismissible overlay,
 // the user must explicitly choose Cancel or the destructive action.
@@ -1218,7 +1285,7 @@ function resizeImageToDataUrl(file, maxDimension, quality = 0.82) {
 
 // ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
 
-const NOTIF_ICONS = { feedback: 'ti-message-2', bug: 'ti-bug', contact: 'ti-message-circle-2', system: 'ti-bell' };
+const NOTIF_ICONS = { feedback: 'ti-message-2', bug: 'ti-bug', contact: 'ti-message-circle-2', post: 'ti-news', system: 'ti-bell' };
 
 function renderNotifications() {
   const view = document.querySelector('[data-view="notifications"]');
@@ -1478,6 +1545,171 @@ function renderAdminOverview() {
         </div>
       </div>
     `;
+  });
+}
+
+let adminPostEditingId = null;
+let adminPostPendingCover = null;
+
+function renderAdminNewsroom() {
+  const view = document.querySelector('[data-view="admin-newsroom"]');
+  adminPostEditingId = null;
+  adminPostPendingCover = null;
+  withLoading(view, () => DB.Posts.list(), posts => {
+    view.innerHTML = `
+      <div class="page-header">
+        <h1 class="h1">Newsroom</h1>
+        <p class="body admin-page-subtitle">${posts.length} post${posts.length === 1 ? '' : 's'}. Publishing notifies every Early Adopter.</p>
+      </div>
+
+      <form id="post-form" class="form-section" novalidate>
+        <p class="form-section-title" id="post-form-title">New Post</p>
+        <div class="field mb-4">
+          <label class="field-label" for="post-title-input">Title</label>
+          <input class="input" type="text" id="post-title-input">
+        </div>
+        <div class="field mb-4">
+          <label class="field-label" for="post-body-input">Body</label>
+          <div class="post-body-toolbar" role="toolbar" aria-label="Formatting">
+            <button type="button" class="post-body-tool-btn" data-fmt="bold" aria-label="Bold"><i class="ti ti-bold" style="font-size:16px"></i></button>
+            <button type="button" class="post-body-tool-btn" data-fmt="italic" aria-label="Italic"><i class="ti ti-italic" style="font-size:16px"></i></button>
+            <button type="button" class="post-body-tool-btn" data-fmt="link" aria-label="Link"><i class="ti ti-link" style="font-size:16px"></i></button>
+            <button type="button" class="post-body-tool-btn" data-fmt="bullet" aria-label="Bullet list"><i class="ti ti-list" style="font-size:16px"></i></button>
+            <button type="button" class="post-body-tool-btn" data-fmt="numbered" aria-label="Numbered list"><i class="ti ti-list-numbers" style="font-size:16px"></i></button>
+          </div>
+          <textarea class="input" id="post-body-input" style="min-height:140px"></textarea>
+        </div>
+        <div class="field mb-4">
+          <label class="field-label">Cover image</label>
+          <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn btn-secondary btn-sm" id="post-cover-btn">
+              <i class="ti ti-upload" style="font-size:16px"></i> Upload Image
+            </button>
+            <input type="file" accept="image/*" id="post-cover-input" class="hidden">
+            <div id="post-cover-preview"></div>
+          </div>
+          <p class="text-muted mt-2">Banner image shown at the top of the post. Recommended: landscape, 1600×900px or wider.</p>
+        </div>
+        <div id="post-form-error" class="field-error hidden mb-4">
+          <i class="ti ti-alert-circle" style="font-size:16px"></i>
+          <span id="post-form-error-text"></span>
+        </div>
+        <div style="display:flex;gap:var(--space-2)">
+          <button type="submit" class="btn btn-primary" id="post-form-submit-btn">Publish Post</button>
+          <button type="button" class="btn btn-secondary hidden" id="post-form-cancel-btn">Cancel</button>
+        </div>
+      </form>
+
+      ${posts.length ? `
+        <div class="form-section">
+          ${posts.map(p => `
+            <div class="admin-record">
+              <div class="admin-record-head">
+                <span class="text-muted">${formatDate(p.createdAt)}${p.updatedAt ? ' · edited' : ''}</span>
+                <span class="ml-auto" style="display:flex;gap:var(--space-2)">
+                  <button type="button" class="chat-action-btn" data-edit="${p.id}" aria-label="Edit"><i class="ti ti-pencil" style="font-size:14px"></i></button>
+                  <button type="button" class="chat-action-btn" data-delete="${p.id}" aria-label="Delete"><i class="ti ti-trash" style="font-size:14px"></i></button>
+                </span>
+              </div>
+              <p class="body admin-record-title">${escHtml(p.title)}</p>
+              <p class="admin-record-meta">${escHtml(p.body)}</p>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    `;
+
+    const titleInput = document.getElementById('post-title-input');
+    const bodyInput = document.getElementById('post-body-input');
+    const coverPreview = document.getElementById('post-cover-preview');
+    const errEl = document.getElementById('post-form-error');
+
+    const renderCoverPreview = () => {
+      coverPreview.innerHTML = adminPostPendingCover
+        ? `<img src="${adminPostPendingCover}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:10px">`
+        : '';
+    };
+
+    document.getElementById('post-cover-btn').addEventListener('click', () => {
+      document.getElementById('post-cover-input').click();
+    });
+    document.getElementById('post-cover-input').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        adminPostPendingCover = await resizeImageToDataUrl(file, 1024, 0.75);
+        renderCoverPreview();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+
+    view.querySelectorAll('.post-body-tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyPostBodyFormat(bodyInput, btn.dataset.fmt));
+    });
+
+    document.getElementById('post-form-cancel-btn').addEventListener('click', () => renderAdminNewsroom());
+
+    view.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const p = posts.find(x => x.id === btn.dataset.edit);
+        if (!p) return;
+        adminPostEditingId = p.id;
+        adminPostPendingCover = p.coverImage;
+        titleInput.value = p.title;
+        bodyInput.value = p.body;
+        renderCoverPreview();
+        document.getElementById('post-form-title').textContent = 'Edit Post';
+        document.getElementById('post-form-submit-btn').textContent = 'Save Changes';
+        document.getElementById('post-form-cancel-btn').classList.remove('hidden');
+        document.getElementById('post-form').scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    view.querySelectorAll('[data-delete]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = posts.find(x => x.id === btn.dataset.delete);
+        if (!p) return;
+        showConfirmModal({
+          title: `Delete "${p.title}"?`,
+          body: 'This permanently removes the post. This cannot be undone.',
+          confirmLabel: 'Delete Post',
+          onConfirm: async () => {
+            await DB.Admin.deletePost(p.id);
+            renderAdminNewsroom();
+          }
+        });
+      });
+    });
+
+    document.getElementById('post-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      errEl.classList.add('hidden');
+      const title = titleInput.value.trim();
+      const body = bodyInput.value.trim();
+      if (!title || !body) {
+        document.getElementById('post-form-error-text').textContent = 'Title and body are required.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      const btn = document.getElementById('post-form-submit-btn');
+      btn.disabled = true;
+      try {
+        const fields = { title, body, coverImage: adminPostPendingCover };
+        if (adminPostEditingId) {
+          await DB.Admin.updatePost(adminPostEditingId, fields);
+          toast('Post updated.');
+        } else {
+          await DB.Admin.createPost(fields);
+          toast('Post published.');
+        }
+        renderAdminNewsroom();
+      } catch (err) {
+        document.getElementById('post-form-error-text').textContent = err.message;
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+      }
+    });
   });
 }
 
@@ -1793,6 +2025,76 @@ function formatDate(iso) {
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Renders lightweight markdown (bold/italic/links/lists) written via the
+// post-body toolbar. Input is HTML-escaped first, so this is safe even
+// though the surrounding tags below are inserted after escaping.
+function formatPostBody(str) {
+  if (!str) return '';
+  const lines = escHtml(str).split('\n');
+  const inline = s => s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  let html = '';
+  let listType = null;
+  const closeList = () => { if (listType) { html += listType === 'ul' ? '</ul>' : '</ol>'; listType = null; } };
+
+  for (const rawLine of lines) {
+    const bullet = /^-\s+(.*)/.exec(rawLine);
+    const numbered = /^\d+\.\s+(.*)/.exec(rawLine);
+    if (bullet) {
+      if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
+      html += `<li>${inline(bullet[1])}</li>`;
+    } else if (numbered) {
+      if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
+      html += `<li>${inline(numbered[1])}</li>`;
+    } else {
+      closeList();
+      html += rawLine.trim() ? `<p>${inline(rawLine)}</p>` : '<br>';
+    }
+  }
+  closeList();
+  return html;
+}
+
+// Wraps or prefixes the textarea's current selection with markdown-lite
+// syntax, matching what formatPostBody() renders.
+function applyPostBodyFormat(textarea, fmt) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const value = textarea.value;
+  const selected = value.slice(start, end);
+
+  let insert, selStart, selEnd;
+  if (fmt === 'bold') {
+    insert = `**${selected || 'bold text'}**`;
+    selStart = start + 2;
+    selEnd = selStart + (selected || 'bold text').length;
+  } else if (fmt === 'italic') {
+    insert = `*${selected || 'italic text'}*`;
+    selStart = start + 1;
+    selEnd = selStart + (selected || 'italic text').length;
+  } else if (fmt === 'link') {
+    const label = selected || 'link text';
+    insert = `[${label}](https://)`;
+    selStart = start + label.length + 3;
+    selEnd = selStart + 8;
+  } else if (fmt === 'bullet' || fmt === 'numbered') {
+    const prefix = fmt === 'bullet' ? '- ' : '1. ';
+    const lines = (selected || 'list item').split('\n').map(l => prefix + l);
+    insert = lines.join('\n');
+    selStart = start;
+    selEnd = start + insert.length;
+  } else {
+    return;
+  }
+
+  textarea.value = value.slice(0, start) + insert + value.slice(end);
+  textarea.focus();
+  textarea.setSelectionRange(selStart, selEnd);
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────

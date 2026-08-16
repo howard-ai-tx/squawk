@@ -112,6 +112,12 @@ const Messages = {
   send(message, attachment) { return api('/messages', { method: 'POST', body: { message, attachment } }); }
 };
 
+// Admin-authored posts, visible to every Early Adopter.
+const Posts = {
+  list() { return api('/posts').then(r => r.posts); },
+  get(id) { return api(`/posts/${id}`); }
+};
+
 // ─── ADMIN (read-only over Early Adopter data, except conversation replies) ──
 
 const Admin = {
@@ -126,9 +132,12 @@ const Admin = {
   conversations() { return api('/admin/conversations').then(r => r.conversations); },
   conversation(eaId) { return api(`/admin/conversations/${eaId}`); },
   reply(eaId, message, attachment) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message, attachment } }); },
-  clearConversation(eaId) { return api(`/admin/conversations/${eaId}/messages`, { method: 'DELETE' }); }
+  clearConversation(eaId) { return api(`/admin/conversations/${eaId}/messages`, { method: 'DELETE' }); },
+  createPost(fields) { return api('/admin/posts', { method: 'POST', body: fields }); },
+  updatePost(id, fields) { return api(`/admin/posts/${id}`, { method: 'PATCH', body: fields }); },
+  deletePost(id) { return api(`/admin/posts/${id}`, { method: 'DELETE' }); }
 };
 
 // ─── GLOBAL EXPORT ────────────────────────────────────────────────────────────
 
-window.DB = { Auth, MyActivity, Profile, Settings, Notifications, Messages, Feedback, Bugs, Admin };
+window.DB = { Auth, MyActivity, Profile, Settings, Notifications, Messages, Posts, Feedback, Bugs, Admin };
