@@ -456,6 +456,7 @@ p, .body { font-size: 16px; font-weight: 400; }
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.006em;
+  text-decoration: none;
   cursor: pointer;
   transition: background var(--dur-instant) var(--ease-out), border-color var(--dur-instant) var(--ease-out),
               transform var(--dur-instant) var(--ease-spring), box-shadow var(--dur-instant) var(--ease-out);

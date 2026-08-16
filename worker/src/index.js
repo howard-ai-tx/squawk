@@ -1,5 +1,5 @@
 import {
-  json, error, genId, hashPassword, verifyPassword, corsHeaders,
+  json, error, genId, hashPassword, verifyPassword, corsHeaders, ALLOWED_ORIGINS,
   earlyAdopterToJson, earlyAdopterToAdminJson, notificationToJson,
   feedbackToJson, bugToJson, messageToJson,
   feedbackToAdminJson, bugToAdminJson
@@ -82,6 +82,65 @@ export default {
           .bind(sessToken, row.id, Date.now() + SESSION_TTL_MS).run();
         const updated = await getEARow(db, row.id);
         return json({ token: sessToken, earlyAdopter: earlyAdopterToJson(updated) }, 200, origin);
+      }
+
+      // Step 1: send the browser to Google. The frontend links here with its
+      // own origin so we know where to send the user back afterward.
+      if (path === '/auth/google/start' && request.method === 'GET') {
+        const redirectOrigin = url.searchParams.get('redirect_origin');
+        const ro = ALLOWED_ORIGINS.includes(redirectOrigin) ? redirectOrigin : ALLOWED_ORIGINS[0];
+        const params = new URLSearchParams({
+          client_id: env.GOOGLE_CLIENT_ID,
+          redirect_uri: ro,
+          response_type: 'code',
+          scope: 'openid email profile',
+          prompt: 'select_account'
+        });
+        return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, 302);
+      }
+
+      // Step 2: Google redirected the browser back to our frontend root with
+      // ?code=... — the frontend immediately POSTs that code here, since only
+      // the Worker holds the client secret needed to exchange it.
+      if (path === '/auth/google/callback' && request.method === 'POST') {
+        const { code, redirectOrigin } = await request.json();
+        if (!code) return error('Missing authorization code.', 400, origin);
+        const ro = ALLOWED_ORIGINS.includes(redirectOrigin) ? redirectOrigin : ALLOWED_ORIGINS[0];
+
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: env.GOOGLE_CLIENT_ID,
+            client_secret: env.GOOGLE_CLIENT_SECRET,
+            redirect_uri: ro,
+            grant_type: 'authorization_code'
+          })
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || !tokenData.id_token) {
+          return error('Google sign-in failed. Try again.', 401, origin);
+        }
+
+        // The id_token is a JWT from Google's own token endpoint (a direct
+        // server-to-server HTTPS call, not user-supplied), so decoding its
+        // payload without a separate signature check is safe here.
+        const payloadJson = atob(tokenData.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'));
+        const payload = JSON.parse(payloadJson);
+        if (!payload.email || !payload.email_verified) {
+          return error('Your Google account does not have a verified email.', 401, origin);
+        }
+
+        const row = await db.prepare('SELECT * FROM early_adopters WHERE lower(email) = lower(?)').bind(payload.email).first();
+        if (!row || !row.password_hash) {
+          return error('No Early Adopter account found for that Google email. Ask Hendrik or Tucker for an invite.', 404, origin);
+        }
+
+        const sessToken = genId('sess');
+        await db.prepare('INSERT INTO sessions (token, ea_id, expires_at) VALUES (?, ?, ?)')
+          .bind(sessToken, row.id, Date.now() + SESSION_TTL_MS).run();
+        return json({ token: sessToken, earlyAdopter: earlyAdopterToJson(row) }, 200, origin);
       }
 
       if (path === '/auth/logout' && request.method === 'POST') {

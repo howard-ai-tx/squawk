@@ -1,6 +1,6 @@
 // ─── CORS ────────────────────────────────────────────────────────────────────
 
-const ALLOWED_ORIGINS = [
+export const ALLOWED_ORIGINS = [
   'https://earlyadopters.howardai.us',
   'http://localhost:4200'
 ];

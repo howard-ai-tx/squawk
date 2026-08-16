@@ -45,6 +45,19 @@ const Auth = {
     return earlyAdopter;
   },
 
+  googleStartUrl() {
+    return `${API_BASE}/auth/google/start?redirect_origin=${encodeURIComponent(window.location.origin)}`;
+  },
+
+  async googleCallback(code) {
+    const { token, earlyAdopter } = await api('/auth/google/callback', {
+      method: 'POST',
+      body: { code, redirectOrigin: window.location.origin }
+    });
+    setToken(token);
+    return earlyAdopter;
+  },
+
   async currentEarlyAdopter() {
     if (!getToken()) return null;
     try {
