@@ -96,7 +96,8 @@ const Bugs = {
 // The EA's single conversation thread with HowardAI.
 const Messages = {
   thread() { return api('/messages').then(r => r.messages); },
-  send(message, attachment) { return api('/messages', { method: 'POST', body: { message, attachment } }); }
+  send(message, attachment, replyToId) { return api('/messages', { method: 'POST', body: { message, attachment, replyToId } }); },
+  react(id, emoji) { return api(`/messages/${id}/react`, { method: 'POST', body: { emoji } }); }
 };
 
 // ─── ADMIN (read-only over Early Adopter data, except conversation replies) ──
@@ -112,7 +113,8 @@ const Admin = {
   bugs() { return api('/admin/bugs').then(r => r.bugs); },
   conversations() { return api('/admin/conversations').then(r => r.conversations); },
   conversation(eaId) { return api(`/admin/conversations/${eaId}`); },
-  reply(eaId, message, attachment) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message, attachment } }); },
+  reply(eaId, message, attachment, replyToId) { return api(`/admin/conversations/${eaId}/messages`, { method: 'POST', body: { message, attachment, replyToId } }); },
+  react(eaId, msgId, emoji) { return api(`/admin/conversations/${eaId}/messages/${msgId}/react`, { method: 'POST', body: { emoji } }); },
   clearConversation(eaId) { return api(`/admin/conversations/${eaId}/messages`, { method: 'DELETE' }); }
 };
 

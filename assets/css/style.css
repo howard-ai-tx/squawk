@@ -1056,9 +1056,72 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 /* Each row is its own column so a message's timestamp always sits directly
    under that message — a single trailing timestamp for the whole thread
    read as buggy/disconnected once more than one message was on screen. */
-.chat-row { display: flex; flex-direction: column; margin-bottom: var(--space-3); max-width: 75%; }
-.chat-row.mine { align-items: flex-end; align-self: flex-end; }
-.chat-row.theirs { align-items: flex-start; align-self: flex-start; }
+.chat-row-wrap { display: flex; flex-direction: column; margin-bottom: var(--space-3); max-width: 75%; }
+.chat-row-wrap.mine { align-items: flex-end; align-self: flex-end; }
+.chat-row-wrap.theirs { align-items: flex-start; align-self: flex-start; }
+
+/* Reply/react icons sit beside the bubble, only on hover — mirrored to the
+   outer side depending on which way the bubble is aligned. */
+.chat-row-inner { display: flex; align-items: flex-end; gap: 4px; }
+.chat-row-wrap.mine .chat-row-inner { flex-direction: row-reverse; }
+
+.chat-row-actions { display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-instant) var(--ease-out); padding-bottom: 4px; }
+.chat-row-wrap:hover .chat-row-actions,
+.chat-row-actions:focus-within { opacity: 1; }
+.chat-action-btn {
+  width: 26px; height: 26px; border-radius: 999px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: var(--light-bg); color: var(--text-secondary); cursor: pointer;
+}
+.chat-action-btn:hover { background: var(--border); color: var(--text-primary); }
+
+.chat-bubble-col { display: flex; flex-direction: column; min-width: 0; }
+.chat-row-wrap.mine .chat-bubble-col { align-items: flex-end; }
+.chat-row-wrap.theirs .chat-bubble-col { align-items: flex-start; }
+
+.chat-reply-quote {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--text-tertiary);
+  padding: 0 var(--space-2) 2px;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.chat-reaction-row { display: flex; gap: 3px; margin-top: 3px; }
+.chat-reaction-chip {
+  width: 20px; height: 20px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light-bg); border: 1px solid var(--border); color: var(--text-secondary);
+}
+
+.chat-reaction-picker {
+  display: flex; gap: 2px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-pill);
+  padding: 4px; margin-top: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.chat-reaction-option {
+  width: 28px; height: 28px; border-radius: 999px; border: none; background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--text-secondary);
+  transition: background var(--dur-instant) var(--ease-out), transform var(--dur-instant) var(--ease-spring);
+}
+.chat-reaction-option:hover { background: var(--light-bg); color: var(--action); transform: scale(1.15); }
+.chat-reaction-option.active { color: var(--action); background: rgba(14,165,233,0.1); }
+
+.chat-reply-bar {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--divider);
+  background: var(--light-bg);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.chat-reply-bar-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-reply-bar-cancel {
+  border: none; background: none; cursor: pointer; color: var(--text-tertiary);
+  display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px;
+}
+.chat-reply-bar-cancel:hover { background: var(--border); color: var(--text-primary); }
 
 .chat-bubble {
   padding: 10px 14px;
@@ -1068,8 +1131,8 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
   white-space: pre-wrap;
   word-break: break-word;
 }
-.chat-row.mine .chat-bubble { background: var(--action); color: #fff; border-bottom-right-radius: 4px; }
-.chat-row.theirs .chat-bubble { background: var(--light-bg); color: var(--text-primary); border-bottom-left-radius: 4px; }
+.chat-row-wrap.mine .chat-bubble { background: var(--action); color: #fff; border-bottom-right-radius: 4px; }
+.chat-row-wrap.theirs .chat-bubble { background: var(--light-bg); color: var(--text-primary); border-bottom-left-radius: 4px; }
 
 .chat-attachment-img {
   max-width: 240px;

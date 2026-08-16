@@ -740,7 +740,13 @@ function formatChatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function chatBubblesHtml(messages, mineSender) {
+const REACTION_ICONS = {
+  heart: 'ti-heart', thumbsup: 'ti-thumb-up', thumbsdown: 'ti-thumb-down',
+  laugh: 'ti-mood-smile', exclaim: 'ti-exclamation-mark', question: 'ti-question-mark'
+};
+const REACTION_LIST = Object.keys(REACTION_ICONS);
+
+function chatBubblesHtml(messages, mineSender, messagesById) {
   if (!messages.length) {
     return `
       <div class="chat-empty">
@@ -759,15 +765,141 @@ function chatBubblesHtml(messages, mineSender) {
       lastDay = day;
     }
     const mine = m.sender === mineSender;
+    const myReactionKey = mineSender === 'ea' ? m.eaReaction : m.adminReaction;
+
+    const original = m.replyToId ? messagesById[m.replyToId] : null;
+    const replyQuote = original ? `
+      <div class="chat-reply-quote">
+        <i class="ti ti-corner-up-left" style="font-size:12px"></i>
+        <span>${escHtml(original.message ? original.message : (original.attachment ? 'Photo' : ''))}</span>
+      </div>
+    ` : '';
+
+    const chips = [];
+    if (m.eaReaction) chips.push(`<span class="chat-reaction-chip" title="Reacted"><i class="ti ${REACTION_ICONS[m.eaReaction]}" style="font-size:11px"></i></span>`);
+    if (m.adminReaction) chips.push(`<span class="chat-reaction-chip" title="Reacted"><i class="ti ${REACTION_ICONS[m.adminReaction]}" style="font-size:11px"></i></span>`);
+
     html += `
-      <div class="chat-row ${mine ? 'mine' : 'theirs'}">
-        ${m.attachment ? `<img class="chat-attachment-img" src="${m.attachment}" alt="Attachment">` : ''}
-        ${m.message ? `<div class="chat-bubble">${escHtml(m.message)}</div>` : ''}
-        <div class="chat-bubble-time">${formatChatTime(m.createdAt)}</div>
+      <div class="chat-row-wrap ${mine ? 'mine' : 'theirs'}" data-msg-id="${m.id}">
+        ${replyQuote}
+        <div class="chat-row-inner">
+          <div class="chat-row-actions">
+            <button type="button" class="chat-action-btn chat-reply-btn" data-id="${m.id}" aria-label="Reply">
+              <i class="ti ti-arrow-back-up" style="font-size:15px"></i>
+            </button>
+            <button type="button" class="chat-action-btn chat-react-btn" data-id="${m.id}" aria-label="React">
+              <i class="ti ti-mood-plus" style="font-size:15px"></i>
+            </button>
+          </div>
+          <div class="chat-bubble-col">
+            ${m.attachment ? `<img class="chat-attachment-img" src="${m.attachment}" alt="Attachment">` : ''}
+            ${m.message ? `<div class="chat-bubble">${escHtml(m.message)}</div>` : ''}
+            ${chips.length ? `<div class="chat-reaction-row">${chips.join('')}</div>` : ''}
+            <div class="chat-bubble-time">${formatChatTime(m.createdAt)}</div>
+          </div>
+        </div>
+        <div class="chat-reaction-picker hidden" data-picker-for="${m.id}">
+          ${REACTION_LIST.map(k => `
+            <button type="button" class="chat-reaction-option ${myReactionKey === k ? 'active' : ''}" data-id="${m.id}" data-emoji="${k}" aria-label="${k}">
+              <i class="ti ${REACTION_ICONS[k]}" style="font-size:16px"></i>
+            </button>
+          `).join('')}
+        </div>
       </div>
     `;
   });
   return html;
+}
+
+// Shared controller for a chat thread — used by both the EA's own
+// conversation and each admin conversation thread. Handles loading,
+// sending (with attachment/reply), reacting, and the reply-preview bar.
+function initChatThread({ scrollId, formId, textareaId, sendBtnId, attachBtnId, fileInputId, previewId, replyBarId, mineSender, listFn, sendFn, reactFn, onLoaded }) {
+  let messagesById = {};
+  let replyTarget = null;
+
+  function renderReplyBar() {
+    const bar = document.getElementById(replyBarId);
+    if (!bar) return;
+    if (!replyTarget) {
+      bar.classList.add('hidden');
+      bar.innerHTML = '';
+      return;
+    }
+    bar.classList.remove('hidden');
+    bar.innerHTML = `
+      <i class="ti ti-corner-up-left" style="font-size:15px"></i>
+      <span class="chat-reply-bar-text">${escHtml(replyTarget.preview)}</span>
+      <button type="button" class="chat-reply-bar-cancel" aria-label="Cancel reply"><i class="ti ti-x" style="font-size:14px"></i></button>
+    `;
+    bar.querySelector('.chat-reply-bar-cancel').addEventListener('click', () => {
+      replyTarget = null;
+      renderReplyBar();
+    });
+  }
+
+  function wireBubbleActions() {
+    const scroll = document.getElementById(scrollId);
+    scroll.querySelectorAll('.chat-reply-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = messagesById[btn.dataset.id];
+        if (!m) return;
+        replyTarget = { id: m.id, preview: m.message ? m.message : (m.attachment ? 'Photo' : '') };
+        renderReplyBar();
+        document.getElementById(textareaId).focus();
+      });
+    });
+    scroll.querySelectorAll('.chat-react-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const picker = scroll.querySelector(`.chat-reaction-picker[data-picker-for="${btn.dataset.id}"]`);
+        const wasOpen = !picker.classList.contains('hidden');
+        scroll.querySelectorAll('.chat-reaction-picker').forEach(p => p.classList.add('hidden'));
+        if (!wasOpen) picker.classList.remove('hidden');
+      });
+    });
+    scroll.querySelectorAll('.chat-reaction-option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const emoji = btn.dataset.emoji;
+        const current = messagesById[id];
+        const already = (mineSender === 'ea' ? current.eaReaction : current.adminReaction) === emoji;
+        try {
+          await reactFn(id, already ? null : emoji);
+          await refresh();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+    });
+  }
+
+  async function refresh() {
+    const messages = await listFn();
+    messagesById = Object.fromEntries(messages.map(m => [m.id, m]));
+    document.getElementById(scrollId).innerHTML = chatBubblesHtml(messages, mineSender, messagesById);
+    scrollChatToBottom(scrollId);
+    wireBubbleActions();
+    if (onLoaded) onLoaded(messages);
+    return messages;
+  }
+
+  wireChatInput({
+    formId, textareaId, sendBtnId, attachBtnId, fileInputId, previewId,
+    onSend: async (message, attachment) => {
+      const replyToId = replyTarget ? replyTarget.id : null;
+      await sendFn(message, attachment, replyToId);
+      replyTarget = null;
+      renderReplyBar();
+      await refresh();
+    }
+  });
+
+  refresh().catch(err => {
+    document.getElementById(scrollId).innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
+  });
+
+  return { refresh };
 }
 
 function wireChatInput({ formId, textareaId, sendBtnId, attachBtnId, fileInputId, previewId, onSend }) {
@@ -883,31 +1015,25 @@ function renderContact() {
       <div class="chat-scroll" id="contact-chat-scroll">
         <div class="admin-loading"><i class="ti ti-loader-2 spin" style="font-size:18px"></i> Loading…</div>
       </div>
+      <div class="chat-reply-bar hidden" id="contact-reply-bar"></div>
       ${chatInputBarHtml('contact-form', 'contact-message', 'contact-send-btn', 'contact-attach-btn', 'contact-file-input', 'contact-attach-preview')}
     </div>
   `;
 
-  DB.Messages.thread().then(messages => {
-    document.getElementById('contact-chat-scroll').innerHTML = chatBubblesHtml(messages, 'ea');
-    scrollChatToBottom('contact-chat-scroll');
-    refreshMessagesBadge();
-  }).catch(err => {
-    document.getElementById('contact-chat-scroll').innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
-  });
-
-  wireChatInput({
+  initChatThread({
+    scrollId: 'contact-chat-scroll',
     formId: 'contact-form',
     textareaId: 'contact-message',
     sendBtnId: 'contact-send-btn',
     attachBtnId: 'contact-attach-btn',
     fileInputId: 'contact-file-input',
     previewId: 'contact-attach-preview',
-    onSend: async (message, attachment) => {
-      await DB.Messages.send(message, attachment);
-      const messages = await DB.Messages.thread();
-      document.getElementById('contact-chat-scroll').innerHTML = chatBubblesHtml(messages, 'ea');
-      scrollChatToBottom('contact-chat-scroll');
-    }
+    replyBarId: 'contact-reply-bar',
+    mineSender: 'ea',
+    listFn: () => DB.Messages.thread(),
+    sendFn: (message, attachment, replyToId) => DB.Messages.send(message, attachment, replyToId),
+    reactFn: (id, emoji) => DB.Messages.react(id, emoji),
+    onLoaded: () => refreshMessagesBadge()
   });
 }
 
@@ -1721,12 +1847,11 @@ function renderAdminConversation(eaId) {
       </div>
       ${chatHeaderHtml(earlyAdopter.name, earlyAdopter.email, earlyAdopter.avatar)}
       <div class="card chat-card">
-        <div class="chat-scroll" id="admin-chat-scroll">${chatBubblesHtml(messages, 'admin')}</div>
+        <div class="chat-scroll" id="admin-chat-scroll"></div>
+        <div class="chat-reply-bar hidden" id="admin-reply-bar"></div>
         ${chatInputBarHtml('admin-reply-form', 'admin-reply-message', 'admin-reply-send-btn', 'admin-reply-attach-btn', 'admin-reply-file-input', 'admin-reply-attach-preview')}
       </div>
     `;
-    scrollChatToBottom('admin-chat-scroll');
-    refreshMessagesBadge();
 
     document.getElementById('admin-convo-back-btn').addEventListener('click', () => showView('admin-contact'));
 
@@ -1742,19 +1867,20 @@ function renderAdminConversation(eaId) {
       });
     });
 
-    wireChatInput({
+    initChatThread({
+      scrollId: 'admin-chat-scroll',
       formId: 'admin-reply-form',
       textareaId: 'admin-reply-message',
       sendBtnId: 'admin-reply-send-btn',
       attachBtnId: 'admin-reply-attach-btn',
       fileInputId: 'admin-reply-file-input',
       previewId: 'admin-reply-attach-preview',
-      onSend: async (message, attachment) => {
-        await DB.Admin.reply(eaId, message, attachment);
-        const { messages } = await DB.Admin.conversation(eaId);
-        document.getElementById('admin-chat-scroll').innerHTML = chatBubblesHtml(messages, 'admin');
-        scrollChatToBottom('admin-chat-scroll');
-      }
+      replyBarId: 'admin-reply-bar',
+      mineSender: 'admin',
+      listFn: () => DB.Admin.conversation(eaId).then(r => r.messages),
+      sendFn: (message, attachment, replyToId) => DB.Admin.reply(eaId, message, attachment, replyToId),
+      reactFn: (id, emoji) => DB.Admin.react(eaId, id, emoji),
+      onLoaded: () => refreshMessagesBadge()
     });
   }).catch(err => {
     view.innerHTML = `<div class="field-error"><i class="ti ti-alert-circle" style="font-size:16px"></i><span>${escHtml(err.message)}</span></div>`;
@@ -1814,6 +1940,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeResourcesDropdown();
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.chat-react-btn') && !e.target.closest('.chat-reaction-picker')) {
+      document.querySelectorAll('.chat-reaction-picker').forEach(p => p.classList.add('hidden'));
+    }
   });
 
   document.querySelectorAll('.app-avatar-trigger').forEach(trigger => {

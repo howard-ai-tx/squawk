@@ -8,6 +8,7 @@ import {
 const SESSION_TTL_MS = 86400000; // 24h
 const MAX_AVATAR_BYTES = 250000; // ~250KB data URL, keeps rows small
 const MAX_ATTACHMENT_BYTES = 600000; // ~600KB data URL, client-resized before upload
+const VALID_REACTIONS = ['heart', 'thumbsup', 'thumbsdown', 'laugh', 'exclaim', 'question'];
 
 async function getEARow(db, id) {
   return db.prepare('SELECT * FROM early_adopters WHERE id = ?').bind(id).first();
@@ -223,17 +224,33 @@ export default {
       }
 
       if (path === '/messages' && request.method === 'POST') {
-        const { message, attachment } = await request.json();
+        const { message, attachment, replyToId } = await request.json();
         const text = (message || '').trim();
         if (!text && !attachment) return error('Message cannot be empty.', 400, origin);
         if (attachment && attachment.length > MAX_ATTACHMENT_BYTES) return error('That image is too large.', 400, origin);
+        let replyTo = null;
+        if (replyToId) {
+          replyTo = await db.prepare('SELECT id FROM messages WHERE id = ? AND ea_id = ?').bind(replyToId, me.id).first();
+        }
         const id = genId('msg');
-        await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, created_at) VALUES (?, ?, 'ea', ?, ?, ?)")
-          .bind(id, me.id, text, attachment || null, new Date().toISOString()).run();
+        await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, reply_to_id, created_at) VALUES (?, ?, 'ea', ?, ?, ?, ?)")
+          .bind(id, me.id, text, attachment || null, replyTo ? replyTo.id : null, new Date().toISOString()).run();
         const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
         // Unread messages surface as a badge on the Messages nav link itself
         // (see /me/message-unread-count), not as a duplicate notification-
         // center entry.
+        return json(messageToJson(row), 200, origin);
+      }
+
+      // Tapback-style reaction on one of the EA's own thread messages.
+      if (path.startsWith('/messages/') && path.endsWith('/react') && request.method === 'POST') {
+        const msgId = path.split('/')[2];
+        const { emoji } = await request.json();
+        if (emoji && !VALID_REACTIONS.includes(emoji)) return error('Not a valid reaction.', 400, origin);
+        const msg = await db.prepare('SELECT id FROM messages WHERE id = ? AND ea_id = ?').bind(msgId, me.id).first();
+        if (!msg) return error('Message not found.', 404, origin);
+        await db.prepare('UPDATE messages SET ea_reaction = ? WHERE id = ?').bind(emoji || null, msgId).run();
+        const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(msgId).first();
         return json(messageToJson(row), 200, origin);
       }
 
@@ -381,14 +398,32 @@ export default {
           const eaId = parts[2];
           const eaRow = await getEARow(db, eaId);
           if (!eaRow) return error('Early Adopter not found.', 404, origin);
-          const { message, attachment } = await request.json();
+          const { message, attachment, replyToId } = await request.json();
           const text = (message || '').trim();
           if (!text && !attachment) return error('Message cannot be empty.', 400, origin);
           if (attachment && attachment.length > MAX_ATTACHMENT_BYTES) return error('That image is too large.', 400, origin);
+          let replyTo = null;
+          if (replyToId) {
+            replyTo = await db.prepare('SELECT id FROM messages WHERE id = ? AND ea_id = ?').bind(replyToId, eaId).first();
+          }
           const id = genId('msg');
-          await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, created_at) VALUES (?, ?, 'admin', ?, ?, ?)")
-            .bind(id, eaId, text, attachment || null, new Date().toISOString()).run();
+          await db.prepare("INSERT INTO messages (id, ea_id, sender, message, attachment, reply_to_id, created_at) VALUES (?, ?, 'admin', ?, ?, ?, ?)")
+            .bind(id, eaId, text, attachment || null, replyTo ? replyTo.id : null, new Date().toISOString()).run();
           const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
+          return json(messageToJson(row), 200, origin);
+        }
+
+        // Tapback-style reaction from an admin on one of the thread's messages.
+        // Path: /admin/conversations/:eaId/messages/:msgId/react
+        if (parts.length === 6 && parts[1] === 'conversations' && parts[3] === 'messages' && parts[5] === 'react' && request.method === 'POST') {
+          const eaId = parts[2];
+          const msgId = parts[4];
+          const { emoji } = await request.json();
+          if (emoji && !VALID_REACTIONS.includes(emoji)) return error('Not a valid reaction.', 400, origin);
+          const msg = await db.prepare('SELECT id FROM messages WHERE id = ? AND ea_id = ?').bind(msgId, eaId).first();
+          if (!msg) return error('Message not found.', 404, origin);
+          await db.prepare('UPDATE messages SET admin_reaction = ? WHERE id = ?').bind(emoji || null, msgId).run();
+          const row = await db.prepare('SELECT * FROM messages WHERE id = ?').bind(msgId).first();
           return json(messageToJson(row), 200, origin);
         }
 

@@ -133,6 +133,9 @@ export function messageToJson(row) {
   return {
     id: row.id, sender: row.sender, message: row.message,
     attachment: row.attachment || null,
+    replyToId: row.reply_to_id || null,
+    eaReaction: row.ea_reaction || null,
+    adminReaction: row.admin_reaction || null,
     readAt: row.read_at, createdAt: row.created_at
   };
 }
